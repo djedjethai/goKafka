@@ -1,0 +1,71 @@
+version: '2'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:6.0.0
+    hostname: zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - ./kafka/zk-data:/var/lib/zookeeper/data
+      - ./kafka/zk-logs:/var/lib/zookeeper/log  
+ 
+  kafka:
+    image: confluentinc/cp-enterprise-kafka:6.0.0
+    hostname: kafka
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: |
+        PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: |
+        PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1    
+    healthcheck:
+      test: ["CMD", "nc", "-vz", "localhost", "9092"]
+      interval: 30s
+      timeout: 10s
+      retries: 4
+    volumes:
+      - ./kafka/kafka-data:/var/lib/kafka/data
+
+  consumer-logger:
+    build:
+      context: consumer-logger
+    environment:
+      kafkaURL: kafka:9092
+        #topic: topic1
+        #GroupID: logger-group
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  producer-api:
+    build:
+      context: producer-api
+    environment:
+      kafkaURL: kafka:9092
+        #topic: topic1
+    ports:
+    - "8080:8080"
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+
+
+
+# log into the running container and create the topic
+# kafka-topics  --bootstrap-server localhost:9092  --create  --topic myTopic  --partitions 4  --replication-factor 1
+# see the topic
+# kafka-topics  --bootstrap-server localhost:9092  --describe  --topic myTopic
