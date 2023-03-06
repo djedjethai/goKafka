@@ -1,3 +1,7 @@
 confluentincWithCompose/kafka
 confluentincLocalhostStart/kafka
+confluentincProducer/kafka
+confluentincJSON/kafka
+
+connectConfluentKafkaCluster/ccloud.properties
 
