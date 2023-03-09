@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	pb "getting-started-with-ccloud-golang/api/v1/proto"
 	"github.com/golang/protobuf/proto"
 	"github.com/riferrei/srclient"
 	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
@@ -17,7 +18,8 @@ import (
 const (
 	producerMode string = "producer"
 	consumerMode string = "consumer"
-	schemaFile   string = "SensorReading.proto"
+	schemaFile   string = "./api/v1/proto/SensorReading.proto"
+	// messageFile  string = "./api/v1/proto/Message.proto"
 )
 
 var devices = []*SensorReading_Device{
@@ -42,6 +44,8 @@ var devices = []*SensorReading_Device{
 		Enabled:  true,
 	},
 }
+
+// const topicMessage = "message"
 
 func main() {
 
@@ -105,13 +109,22 @@ func producer(props map[string]string, topic string) {
 	if schema == nil {
 		// var b bool = false
 		schemaBytes, _ := ioutil.ReadFile(schemaFile)
-		// schema, err = schemaRegistryClient.CreateSchema(topic, string(schemaBytes), "PROTOBUF", false)
 		schema, err = schemaRegistryClient.CreateSchema(topic, string(schemaBytes), "PROTOBUF")
-		// schema, err = schemaRegistryClient.CreateSchema(topic, string(schemaBytes), "PROTOBUF", b)
 		if err != nil {
 			panic(fmt.Sprintf("Error creating the schema %s", err))
 		}
 	}
+
+	// TODO to delete, add a second topic
+	// schemaMsg, err := schemaRegistryClient.GetLatestSchema(topicMessage)
+	// if schemaMsg == nil {
+	// 	// var b bool = false
+	// 	schemaBytes, _ := ioutil.ReadFile(messageFile)
+	// 	schema, err = schemaRegistryClient.CreateSchema(topic, string(schemaBytes), "PROTOBUF")
+	// 	if err != nil {
+	// 		panic(fmt.Sprintf("Error creating the schema %s", err))
+	// 	}
+	// }
 
 	for {
 
@@ -194,7 +207,7 @@ func consumer(props map[string]string, topic string) {
 	for {
 		record, err := consumer.ReadMessage(-1)
 		if err == nil {
-			sensorReading := &SensorReading{}
+			sensorReading := &pb.SensorReading{}
 			err = proto.Unmarshal(record.Value[7:], sensorReading)
 			if err != nil {
 				panic(fmt.Sprintf("Error deserializing the record: %s", err))
