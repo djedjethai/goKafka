@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
-	"io/ioutil"
+	// "io/ioutil"
 	"math/rand"
 	"os"
 	"strings"
@@ -108,25 +108,30 @@ func producer(props map[string]string, topic string) {
 	schema, err := schemaRegistryClient.GetLatestSchema(topic)
 	if schema == nil {
 		// var b bool = false
-		schemaBytes, _ := ioutil.ReadFile(schemaFile)
+		// schemaBytes, _ := ioutil.ReadFile(schemaFile)
+		schemaBytes := []byte(
+			`
+			syntax = "proto3";
+
+			package io.confluent.cloud.demo.domain1;
+
+			option go_package = "getting-started-with-ccloud-golang/api/v1/proto";
+
+			message Message {
+				string text = 1;
+			}`,
+		)
 		schema, err = schemaRegistryClient.CreateSchema(topic, string(schemaBytes), "PROTOBUF")
 		if err != nil {
 			panic(fmt.Sprintf("Error creating the schema %s", err))
 		}
 	}
 
-	// TODO to delete, add a second topic
-	// schemaMsg, err := schemaRegistryClient.GetLatestSchema(topicMessage)
-	// if schemaMsg == nil {
-	// 	// var b bool = false
-	// 	schemaBytes, _ := ioutil.ReadFile(messageFile)
-	// 	schema, err = schemaRegistryClient.CreateSchema(topic, string(schemaBytes), "PROTOBUF")
-	// 	if err != nil {
-	// 		panic(fmt.Sprintf("Error creating the schema %s", err))
-	// 	}
-	// }
-
 	for {
+
+		msg := pb.Message{
+			Text: "arrrrrchhhhhhhhhhh",
+		}
 
 		choosen := rand.Intn(len(devices))
 		if choosen == 0 {
@@ -135,11 +140,11 @@ func producer(props map[string]string, topic string) {
 		deviceSelected := devices[choosen-1]
 
 		key := deviceSelected.DeviceID
-		sensorReading := SensorReading{
-			Device:   deviceSelected,
-			DateTime: time.Now().UnixNano(),
-			Reading:  rand.Float64(),
-		}
+		// sensorReading := SensorReading{
+		// 	Device:   deviceSelected,
+		// 	DateTime: time.Now().UnixNano(),
+		// 	Reading:  rand.Float64(),
+		// }
 
 		recordValue := []byte{}
 
@@ -156,7 +161,8 @@ func producer(props map[string]string, topic string) {
 		recordValue = append(recordValue, messageIndexBytes...)
 
 		// Now write the bytes from the actual value...
-		valueBytes, _ := proto.Marshal(&sensorReading)
+		// valueBytes, _ := proto.Marshal(&sensorReading)
+		valueBytes, _ := proto.Marshal(&msg)
 		recordValue = append(recordValue, valueBytes...)
 
 		producer.Produce(&kafka.Message{
@@ -207,15 +213,18 @@ func consumer(props map[string]string, topic string) {
 	for {
 		record, err := consumer.ReadMessage(-1)
 		if err == nil {
-			sensorReading := &pb.SensorReading{}
-			err = proto.Unmarshal(record.Value[7:], sensorReading)
+			// sensorReading := &pb.SensorReading{}
+			msg := &pb.Message{}
+			// err = proto.Unmarshal(record.Value[7:], sensorReading)
+			err = proto.Unmarshal(record.Value[7:], msg)
 			if err != nil {
 				panic(fmt.Sprintf("Error deserializing the record: %s", err))
 			}
-			fmt.Printf("SensorReading[device=%s, dateTime=%d, reading=%f]\n",
-				sensorReading.Device.GetDeviceID(),
-				sensorReading.GetDateTime(),
-				sensorReading.GetReading())
+			fmt.Println("seeeee: ", msg.Text)
+			// fmt.Printf("SensorReading[device=%s, dateTime=%d, reading=%f]\n",
+			// 	sensorReading.Device.GetDeviceID(),
+			// 	sensorReading.GetDateTime(),
+			// 	sensorReading.GetReading())
 		} else {
 			fmt.Println(err)
 		}
