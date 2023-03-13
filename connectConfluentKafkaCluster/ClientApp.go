@@ -117,8 +117,10 @@ func producer(props map[string]string, topic string) {
 
 			option go_package = "getting-started-with-ccloud-golang/api/v1/proto";
 
-			message Message {
-				string text = 1;
+			message Person {
+				string name = 1;
+				float age = 2;
+				string address = 3;
 			}`,
 		)
 		schema, err = schemaRegistryClient.CreateSchema(topic, string(schemaBytes), "PROTOBUF")
@@ -129,8 +131,10 @@ func producer(props map[string]string, topic string) {
 
 	for {
 
-		msg := pb.Message{
-			Text: "arrrrrchhhhhhhhhhh",
+		msg := pb.Person{
+			Name:    "robert",
+			Age:     23,
+			Address: "the address",
 		}
 
 		choosen := rand.Intn(len(devices))
@@ -214,13 +218,13 @@ func consumer(props map[string]string, topic string) {
 		record, err := consumer.ReadMessage(-1)
 		if err == nil {
 			// sensorReading := &pb.SensorReading{}
-			msg := &pb.Message{}
+			msg := &pb.Person{}
 			// err = proto.Unmarshal(record.Value[7:], sensorReading)
 			err = proto.Unmarshal(record.Value[7:], msg)
 			if err != nil {
 				panic(fmt.Sprintf("Error deserializing the record: %s", err))
 			}
-			fmt.Println("seeeee: ", msg.Text)
+			fmt.Println("seeeee: ", msg.Name, " / ", msg.Age)
 			// fmt.Printf("SensorReading[device=%s, dateTime=%d, reading=%f]\n",
 			// 	sensorReading.Device.GetDeviceID(),
 			// 	sensorReading.GetDateTime(),
