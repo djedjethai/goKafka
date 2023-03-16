@@ -61,7 +61,6 @@ func main() {
 		fmt.Printf("Invalid option. Valid options are '%s' and '%s'.",
 			producerMode, consumerMode)
 	}
-
 }
 
 /**************************************************/
@@ -106,6 +105,12 @@ func producer(props map[string]string, topic string) {
 
 	// schema, err := schemaRegistryClient.GetLatestSchema(topic, false)
 	schema, err := schemaRegistryClient.GetLatestSchema(topic)
+
+	// !!! if I need to update the shema version => recreate the schema
+	// what ever the changement in the schema, at the time it's recreated
+	// the old schema is replaced by the new one and version increase +1
+	// !!! BUT !!! already registered fields can not be modify(can add fields only)
+	schema = nil
 	if schema == nil {
 		// var b bool = false
 		// schemaBytes, _ := ioutil.ReadFile(schemaFile)
@@ -120,9 +125,17 @@ func producer(props map[string]string, topic string) {
 			message Person {
 				string name = 1;
 				float age = 2;
-				string address = 3;
+				string address = 3; 
+				int32 code_postal = 4;
+				string firstname = 5;
+				Test mytest = 6;
+			};
+
+			message Test {
+				string text = 1;
 			}`,
 		)
+		// Test mytest = 6;
 		schema, err = schemaRegistryClient.CreateSchema(topic, string(schemaBytes), "PROTOBUF")
 		if err != nil {
 			panic(fmt.Sprintf("Error creating the schema %s", err))
@@ -131,10 +144,15 @@ func producer(props map[string]string, topic string) {
 
 	for {
 
+		tt := &pb.Test{Text: "this a is a good test"}
+
 		msg := pb.Person{
-			Name:    "robert",
-			Age:     23,
-			Address: "the address",
+			Name:       "robert",
+			Age:        23,
+			Address:    "the address",
+			CodePostal: 10111,
+			Firstname:  "simon",
+			Mytest:     tt,
 		}
 
 		choosen := rand.Intn(len(devices))
@@ -224,7 +242,7 @@ func consumer(props map[string]string, topic string) {
 			if err != nil {
 				panic(fmt.Sprintf("Error deserializing the record: %s", err))
 			}
-			fmt.Println("seeeee: ", msg.Name, " / ", msg.Age)
+			fmt.Println("seeeee: ", msg.Name, "-", msg.Firstname, " / ", msg.Age, " / ", msg.CodePostal, "\n", msg.Mytest.Text)
 			// fmt.Printf("SensorReading[device=%s, dateTime=%d, reading=%f]\n",
 			// 	sensorReading.Device.GetDeviceID(),
 			// 	sensorReading.GetDateTime(),
