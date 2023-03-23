@@ -12,9 +12,9 @@ import (
 	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 )
 
-// TopicName holds the name of the topic
-// const TopicName string = "SensorReading"
-const TopicName string = "Person"
+// TopicName holds the name of the topic, for kafka registry this is the "subject"
+// convention naming should be like so: topicName-key or topicName-value
+const TopicName string = "Person-value"
 
 // PropsFile holds the filename with config
 const PropsFile string = "ccloud.properties"

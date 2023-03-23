@@ -4,4 +4,6 @@ confluentincProducer/kafka
 confluentincJSON/kafka
 
 connectConfluentKafkaCluster/ccloud.properties
+connectConfluentKafkaCluster/kafka
 
+confluentincWithRegistry/kafka
