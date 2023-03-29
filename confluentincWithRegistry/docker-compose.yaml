@@ -47,6 +47,29 @@ services:
     volumes:
       - ./kafka/kafka-data:/var/lib/kafka/data
 
-
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.1.0
+    hostname: schema-registry
+    container_name: schema-registry
+    user: root
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'kafka:9092'
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    healthcheck:
+      test: nc -z localhost 8081 || exit -1 
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    volumes:
+      - ./kafka/registry:/etc/schema-registry
+        #networks:
+        #- integration-test-network
 
 

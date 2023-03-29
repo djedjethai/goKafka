@@ -1,7 +1,7 @@
 package main
 
 import (
-	// "encoding/binary"
+	"encoding/binary"
 	"fmt"
 	"log"
 	// "io/ioutil"
@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	// pb "getting-started-with-ccloud-golang/api/v1/proto"
-	// "github.com/golang/protobuf/proto"
-	// "github.com/riferrei/srclient"
+	pb "getting-started-with-ccloud-golang/api/v1/proto"
+	"github.com/golang/protobuf/proto"
+	"github.com/riferrei/srclient"
 	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 )
 
@@ -45,6 +45,10 @@ var devices = []*SensorReading_Device{
 		DeviceID: NewUUID(),
 		Enabled:  true,
 	},
+}
+
+type Message struct {
+	Text string
 }
 
 // const topicMessage = "message"
@@ -98,6 +102,7 @@ func producer(topic string) {
 		}
 	}()
 
+	schemaRegistryClient := srclient.CreateSchemaRegistryClient("http://127.0.0.1:8081")
 	// schemaRegistryClient := srclient.CreateSchemaRegistryClient(props["schema.registry.url"])
 	// schemaRegistryClient.CodecCreationEnabled(false)
 	// srBasicAuthUserInfo := props["schema.registry.basic.auth.user.info"]
@@ -105,47 +110,41 @@ func producer(topic string) {
 	// schemaRegistryClient.SetCredentials(credentials[0], credentials[1])
 
 	// // schema, err := schemaRegistryClient.GetLatestSchema(topic, false)
-	// schema, err := schemaRegistryClient.GetLatestSchema(topic)
+	schema, err := schemaRegistryClient.GetLatestSchema(topic)
+
+	fmt.Println("The schema: ", schema)
 
 	// // !!! if I need to update the shema version => recreate the schema
 	// // what ever the changement in the schema, at the time it's recreated
 	// // the old schema is replaced by the new one and version increase +1
 	// // !!! BUT !!! already registered fields can not be modify(can add fields only)
-	// schema = nil
-	// if schema == nil {
-	// 	// var b bool = false
-	// 	// schemaBytes, _ := ioutil.ReadFile(schemaFile)
-	// 	schemaBytes := []byte(
-	// 		`
-	// 		syntax = "proto3";
+	schema = nil
+	if schema == nil {
+		// var b bool = false
+		// schemaBytes, _ := ioutil.ReadFile(schemaFile)
+		schemaBytes := []byte(
+			`
+			syntax = "proto3";
 
-	// 		package io.confluent.cloud.demo.domain1;
+			package io.confluent.cloud.demo.domain1;
 
-	// 		option go_package = "getting-started-with-ccloud-golang/api/v1/proto";
-
-	// 		message Person {
-	// 			string name = 1;
-	// 			float age = 2;
-	// 			string address = 3;
-	// 			int32 code_postal = 4;
-	// 			string firstname = 5;
-	// 			Test mytest = 6;
-	// 		};
-
-	// 		message Test {
-	// 			string text = 1;
-	// 		}`,
-	// 	)
-	// 	// Test mytest = 6;
-	// 	schema, err = schemaRegistryClient.CreateSchema(topic, string(schemaBytes), "PROTOBUF")
-	// 	if err != nil {
-	// 		panic(fmt.Sprintf("Error creating the schema %s", err))
-	// 	}
-	// }
+			option go_package = "getting-started-with-ccloud-golang/api/v1/proto";
+	
+			message Message {
+				string text = 1;
+			}`,
+		)
+		// Test mytest = 6;
+		schema, err = schemaRegistryClient.CreateSchema(topic, string(schemaBytes), "PROTOBUF")
+		if err != nil {
+			panic(fmt.Sprintf("Error creating the schema %s", err))
+		}
+		fmt.Println("look like schema has been created...")
+	}
 
 	for {
 
-		// tt := &pb.Test{Text: "this a is a good test"}
+		tt := &pb.Message{Text: "this a is a good test"}
 
 		// msg := pb.Person{
 		// 	Name:       "robert",
@@ -164,8 +163,8 @@ func producer(topic string) {
 
 		// key := deviceSelected.DeviceID
 
-		// recordValue := []byte{}
-		recordValue := []byte("that is a test de fou")
+		recordValue := []byte{}
+		// recordValue := []byte("that is a test de fou")
 		key := "key"
 
 		// // The code below is only necessary if we want to deserialize records
@@ -173,17 +172,18 @@ func producer(topic string) {
 		// // [io.confluent.kafka.serializers.protobuf.KafkaProtobufDeserializer]
 		// // Therefore, we need to arrange the bytes in the following format:
 		// // [magicByte] + [schemaID] + [messageIndex] + [value]
-		// recordValue = append(recordValue, byte(0))
-		// schemaIDBytes := make([]byte, 4)
-		// binary.BigEndian.PutUint32(schemaIDBytes, uint32(schema.ID()))
-		// recordValue = append(recordValue, schemaIDBytes...)
-		// messageIndexBytes := []byte{byte(2), byte(0)}
-		// recordValue = append(recordValue, messageIndexBytes...)
+		recordValue = append(recordValue, byte(0))
+		schemaIDBytes := make([]byte, 4)
+		binary.BigEndian.PutUint32(schemaIDBytes, uint32(schema.ID()))
+		recordValue = append(recordValue, schemaIDBytes...)
+		messageIndexBytes := []byte{byte(2), byte(0)}
+		recordValue = append(recordValue, messageIndexBytes...)
 
-		// // Now write the bytes from the actual value...
-		// // valueBytes, _ := proto.Marshal(&sensorReading)
+		// Now write the bytes from the actual value...
+		// valueBytes, _ := proto.Marshal(&sensorReading)
 		// valueBytes, _ := proto.Marshal(&msg)
-		// recordValue = append(recordValue, valueBytes...)
+		valueBytes, _ := proto.Marshal(tt)
+		recordValue = append(recordValue, valueBytes...)
 
 		producer.Produce(&kafka.Message{
 			TopicPartition: kafka.TopicPartition{
@@ -209,8 +209,9 @@ func consumer(topic string) {
 	// need to have the schema to be able to deserialize the record.
 	// Thus keeping the code here for future use ¯\_(ツ)_/¯
 
+	schemaRegistryClient := srclient.CreateSchemaRegistryClient("http://127.0.0.1:8081")
 	// schemaRegistryClient := srclient.CreateSchemaRegistryClient(props["schema.registry.url"])
-	// schemaRegistryClient.CodecCreationEnabled(false)
+	schemaRegistryClient.CodecCreationEnabled(false)
 	// srBasicAuthUserInfo := props["schema.registry.basic.auth.user.info"]
 	// credentials := strings.Split(srBasicAuthUserInfo, ":")
 	// schemaRegistryClient.SetCredentials(credentials[0], credentials[1])
@@ -232,34 +233,27 @@ func consumer(topic string) {
 	run := true
 
 	for run {
-		msg, err := c.ReadMessage(time.Second)
-		if err == nil {
-			fmt.Printf("Message on %s: %s\n", msg.TopicPartition, string(msg.Value))
-			// } else if !err.(kafka.Error).IsTimeout() {
-		} else if err.(kafka.Error).IsFatal() {
-			// The client will automatically try to recover from all errors.
-			// Timeout is not considered an error because it is raised by
-			// ReadMessage in absence of messages.
-			log.Printf("Consumer error: %v (%v)\n", err, msg)
-		}
 
-		// record, err := consumer.ReadMessage(-1)
-		// if err == nil {
-		// 	// sensorReading := &pb.SensorReading{}
-		// 	msg := &pb.Person{}
-		// 	// err = proto.Unmarshal(record.Value[7:], sensorReading)
-		// 	err = proto.Unmarshal(record.Value[7:], msg)
-		// 	if err != nil {
-		// 		panic(fmt.Sprintf("Error deserializing the record: %s", err))
-		// 	}
-		// 	fmt.Println("seeeee: ", msg.Name, "-", msg.Firstname, " / ", msg.Age, " / ", msg.CodePostal, "\n", msg.Mytest.Text)
-		// 	// fmt.Printf("SensorReading[device=%s, dateTime=%d, reading=%f]\n",
-		// 	// 	sensorReading.Device.GetDeviceID(),
-		// 	// 	sensorReading.GetDateTime(),
-		// 	// 	sensorReading.GetReading())
-		// } else {
-		// 	fmt.Println(err)
-		// }
+		record, err := c.ReadMessage(-1)
+		if err == nil {
+			// sensorReading := &pb.SensorReading{}
+			msg := &pb.Message{}
+			// err = proto.Unmarshal(record.Value[7:], sensorReading)
+			err = proto.Unmarshal(record.Value[7:], msg)
+			if err != nil {
+				panic(fmt.Sprintf("Error deserializing the record: %s", err))
+			}
+			fmt.Printf("Message on %s: %s\n", record.TopicPartition, string(record.Value))
+			fmt.Println("seeeee: ", msg.Text)
+			// fmt.Println("seeeee: ", msg.Name, "-", msg.Firstname, " / ", msg.Age, " / ", msg.CodePostal, "\n", msg.Mytest.Text)
+			// fmt.Printf("SensorReading[device=%s, dateTime=%d, reading=%f]\n",
+			// 	sensorReading.Device.GetDeviceID(),
+			// 	sensorReading.GetDateTime(),
+			// 	sensorReading.GetReading())
+		} else if err.(kafka.Error).IsFatal() {
+			// fmt.Println(err)
+			log.Printf("Consumer error: %v \n", err)
+		}
 	}
 }
 
