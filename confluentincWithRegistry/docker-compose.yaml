@@ -30,15 +30,28 @@ services:
     ports:
       - "9092:9092"
       - "29092:29092"
+        # - "8081:8081"
     environment:
-      KAFKA_BROKER_ID: 1
+      KAFKA_HEAP_OPTS: '-Xms1g -Xmx1g' # that will create 1GB heaps, should 4GB for prod
+      KAFKA_BROKER_ID: -1
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: |
         PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: |
         PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1    
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_BALANCER_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_CONFLUENT_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      LOG_DIR: /var/log/kafka
+      KAFKA_DATA_DIR: /var/lib/kafka
+      CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
+      CONFLUENT_METRICS_ENABLE: 'false'
+      CONFLUENT_SUPPORT_CUSTOMER_ID: 'anonymous'
+      CONFLUENT_REPORTERS_TELEMETRY_AUTO_ENABLE: "false"
     healthcheck:
       test: ["CMD", "nc", "-vz", "localhost", "9092"]
       interval: 30s
@@ -46,6 +59,7 @@ services:
       retries: 4
     volumes:
       - ./kafka/kafka-data:/var/lib/kafka/data
+      - ./kafka/kafka-log:/var/log/kafka
 
   schema-registry:
     image: confluentinc/cp-schema-registry:7.1.0

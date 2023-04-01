@@ -15,7 +15,7 @@ import (
 // TopicName holds the name of the topic, for kafka registry this is the "subject"
 // convention naming should be like so: topicName-key or topicName-value
 // const TopicName string = "Person-value"
-const TopicName string = "myTopic"
+const TopicName string = "person-new"
 
 // PropsFile holds the filename with config
 const PropsFile string = "ccloud.properties"
