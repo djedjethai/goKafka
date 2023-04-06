@@ -23,7 +23,8 @@ const (
 	schemaFile   string = "./api/v1/proto/Person.proto"
 	// schemaFile   string = "./api/v1/proto/SensorReading.proto"
 	// messageFile  string = "./api/v1/proto/Message.proto"
-	connectToAll string = "127.0.0.1:19092,127.0.0.1:29092,127.0.0.1:39092"
+	connectToAll    string = "127.0.0.1:19092,127.0.0.1:29092,127.0.0.1:39092"
+	registryClients string = "127.0.0.1:8081,127.0.0.1:8082,127.0.0.1:8083"
 )
 
 var devices = []*SensorReading_Device{
@@ -103,6 +104,14 @@ func producer(topic string) {
 			}
 		}
 	}()
+
+	// can not connect to multiple registry with a single client
+	// TODO the idea would be to have 2 - 3 clients and if a connection return an err
+	// then use the second client.....
+	// Create client for Schema Registry 1
+
+	// // Create client for Schema Registry 2
+	// sr2Client := srclient.CreateSchemaRegistryClient("http://127.0.0.1:8083")
 
 	schemaRegistryClient := srclient.CreateSchemaRegistryClient("http://127.0.0.1:8081")
 

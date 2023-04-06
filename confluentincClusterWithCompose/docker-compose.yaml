@@ -154,7 +154,6 @@ services:
       timeout: 10s
       retries: 4
 
-
   kafka_manager:
     image: hlebalbau/kafka-manager:stable
     ports:
@@ -169,7 +168,7 @@ services:
 
   schema-registry-1:
     image: confluentinc/cp-schema-registry:7.1.0
-    hostname: schema-registry
+    hostname: schema-registry-1
     container_name: schema-registry-1
     user: root
     depends_on:
@@ -178,8 +177,8 @@ services:
     ports:
       - "8081:8081"
     environment:
-      SCHEMA_REGISTRY_HOST_NAME: schema-registry
-      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'kafka-1:19092'
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry-1
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'kafka-1:19092,kafka-2:29092,kafka-3:39092'
       SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
     healthcheck:
       test: nc -z localhost 8081 || exit -1 
@@ -188,8 +187,53 @@ services:
       retries: 6
       start_period: 30s
     volumes:
-      - ./kafka/registry:/etc/schema-registry
+      - ./kafka/registry1:/etc/schema-registry
 
+  schema-registry-2:
+    image: confluentinc/cp-schema-registry:7.1.0
+    hostname: schema-registry-2
+    container_name: schema-registry-2
+    user: root
+    depends_on:
+      kafka-2:
+        condition: service_healthy
+    ports:
+      - "8082:8082"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry-2
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'kafka-1:19092,kafka-2:29092,kafka-3:39092'
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8082
+    healthcheck:
+      test: nc -z localhost 8082 || exit -1 
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    volumes:
+      - ./kafka/registry2:/etc/schema-registry
+
+  schema-registry-3:
+    image: confluentinc/cp-schema-registry:7.1.0
+    hostname: schema-registry-3
+    container_name: schema-registry-3
+    user: root
+    depends_on:
+      kafka-3:
+        condition: service_healthy
+    ports:
+      - "8083:8083"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry-3
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'kafka-1:19092,kafka-2:29092,kafka-3:39092'
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8083
+    healthcheck:
+      test: nc -z localhost 8083 || exit -1 
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    volumes:
+      - ./kafka/registry3:/etc/schema-registry
 
 
 
