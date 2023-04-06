@@ -83,6 +83,11 @@ services:
     volumes:
       - ./kafka/kafka-data1:/var/lib/kafka/data
       - ./kafka/kafka-log1:/var/log/kafka
+    healthcheck:
+      test: ["CMD", "nc", "-vz", "kafka-1", "19092"]
+      interval: 30s
+      timeout: 10s
+      retries: 4
 
   kafka-2:
     # image: confluentinc/cp-kafka:latest
@@ -110,6 +115,12 @@ services:
     volumes:
       - ./kafka/kafka-data2:/var/lib/kafka/data
       - ./kafka/kafka-log2:/var/log/kafka
+    healthcheck:
+      test: ["CMD", "nc", "-vz", "kafka-2", "29092"]
+      interval: 30s
+      timeout: 10s
+      retries: 4
+
 
   kafka-3:
     # image: confluentinc/cp-kafka:latest
@@ -137,6 +148,12 @@ services:
     volumes:
       - ./kafka/kafka-data3:/var/lib/kafka/data
       - ./kafka/kafka-log3:/var/log/kafka
+    healthcheck:
+      test: ["CMD", "nc", "-vz", "kafka-3", "39092"]
+      interval: 30s
+      timeout: 10s
+      retries: 4
+
 
   kafka_manager:
     image: hlebalbau/kafka-manager:stable
@@ -150,127 +167,29 @@ services:
     volumes:
       - ./kafka/manager:/kafka-manager/logs
 
+  schema-registry-1:
+    image: confluentinc/cp-schema-registry:7.1.0
+    hostname: schema-registry
+    container_name: schema-registry-1
+    user: root
+    depends_on:
+      kafka-1:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'kafka-1:19092'
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    healthcheck:
+      test: nc -z localhost 8081 || exit -1 
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    volumes:
+      - ./kafka/registry:/etc/schema-registry
 
 
 
 
-      # does not work.....??
-# version: '2.1'
-# 
-# services:
-#   zookeeper-1:
-#     # image: confluentinc/cp-zookeeper:latest
-#     image: confluentinc/cp-zookeeper:7.3.2
-#     user: root
-#     environment:
-#       ZOOKEEPER_SERVER_ID: 1
-#       ZOOKEEPER_CLIENT_PORT: 22181
-#       ZOOKEEPER_TICK_TIME: 2000
-#       ZOOKEEPER_INIT_LIMIT: 5
-#       ZOOKEEPER_SYNC_LIMIT: 2
-#       ZOOKEEPER_SERVERS: localhost:22888:23888;localhost:32888:33888;localhost:42888:43888
-#     network_mode: host
-#     volumes:
-#       - ./zk/zk-data1:/var/lib/zookeeper/data
-#       - ./zk/zk-logs1:/var/lib/zookeeper/log  
-#     extra_hosts:
-#       - "moby: 127.0.0.1"
-#   
-#   zookeeper-2:
-#     # image: confluentinc/cp-zookeeper:latest
-#     image: confluentinc/cp-zookeeper:7.3.2
-#     user: root
-#     environment:
-#       ZOOKEEPER_SERVER_ID: 2
-#       ZOOKEEPER_CLIENT_PORT: 32181
-#       ZOOKEEPER_TICK_TIME: 2000
-#       ZOOKEEPER_INIT_LIMIT: 5
-#       ZOOKEEPER_SYNC_LIMIT: 2
-#       ZOOKEEPER_SERVERS: localhost:22888:23888;localhost:32888:33888;localhost:42888:43888
-#     network_mode: host
-#     volumes:
-#       - ./zk/zk-data2:/var/lib/zookeeper/data
-#       - ./zk/zk-logs2:/var/lib/zookeeper/log  
-#     extra_hosts:
-#       - "moby: 127.0.0.1"
-#   
-#   zookeeper-3:
-#     # image: confluentinc/cp-zookeeper:latest
-#     image: confluentinc/cp-zookeeper:7.3.2
-#     user: root
-#     environment:
-#       ZOOKEEPER_SERVER_ID: 3
-#       ZOOKEEPER_CLIENT_PORT: 42181
-#       ZOOKEEPER_TICK_TIME: 2000
-#       ZOOKEEPER_INIT_LIMIT: 5
-#       ZOOKEEPER_SYNC_LIMIT: 2
-#       ZOOKEEPER_SERVERS: localhost:22888:23888;localhost:32888:33888;localhost:42888:43888
-#     network_mode: host
-#     volumes:
-#       - ./zk/zk-data3:/var/lib/zookeeper/data
-#       - ./zk/zk-logs3:/var/lib/zookeeper/log  
-#     extra_hosts:
-#       - "moby: 127.0.0.1"
-# 
-#   kafka-1:
-#     # image: confluentinc/cp-kafka:latest
-#     image: confluentinc/cp-server:7.0.1
-#     network_mode: host
-#     user: root
-#     depends_on:
-#       - zookeeper-1
-#       - zookeeper-2
-#       - zookeeper-3
-#     environment:
-#       KAFKA_BROKER_ID: 1
-#       KAFKA_ZOOKEEPER_CONNECT: localhost:22181,localhost:32181,localhost:42181
-#       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:19092
-#     ports:
-#       - "19092:19092"
-#     volumes:
-#       - ./kafka/kafka-data1:/var/lib/kafka/data
-#       - ./kafka/kafka-log1:/var/log/kafka
-#     extra_hosts:
-#       - "moby: 127.0.0.1"
-#   
-#   kafka-2:
-#     # image: confluentinc/cp-kafka:latest
-#     image: confluentinc/cp-server:7.0.1
-#     network_mode: host
-#     user: root
-#     depends_on:
-#       - zookeeper-1
-#       - zookeeper-2
-#       - zookeeper-3
-#     environment:
-#       KAFKA_BROKER_ID: 2
-#       KAFKA_ZOOKEEPER_CONNECT: localhost:22181,localhost:32181,localhost:42181
-#       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:29092
-#     ports:
-#       - "29092:29092"
-#     volumes:
-#       - ./kafka/kafka-data2:/var/lib/kafka/data
-#       - ./kafka/kafka-log2:/var/log/kafka
-#     extra_hosts:
-#       - "moby: 127.0.0.1"
-#   
-#   kafka-3:
-#     # image: confluentinc/cp-kafka:latest
-#     image: confluentinc/cp-server:7.0.1
-#     network_mode: host
-#     user: root
-#     depends_on:
-#       - zookeeper-1
-#       - zookeeper-2
-#       - zookeeper-3
-#     environment:
-#       KAFKA_BROKER_ID: 3
-#       KAFKA_ZOOKEEPER_CONNECT: localhost:22181,localhost:32181,localhost:42181
-#       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:39092
-#     ports:
-#       - "39092:39092"
-#     volumes:
-#       - ./kafka/kafka-data3:/var/lib/kafka/data
-#       - ./kafka/kafka-log3:/var/log/kafka
-#     extra_hosts:
-#       - "moby: 127.0.0.1"
