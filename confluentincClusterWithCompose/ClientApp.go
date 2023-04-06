@@ -57,6 +57,8 @@ const kfkAddr = "127.0.0.1:19092"
 const kfkOther = "127.0.0.1:29092"
 const kfkCons = "127.0.0.1:39092"
 
+const connectToAll = "127.0.0.1:19092,127.0.0.1:29092,127.0.0.1:39092"
+
 func main() {
 
 	clientMode := os.Args[1]
@@ -84,7 +86,7 @@ func producer(topic string) {
 	// CreateTopic(props)
 
 	// producer, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": "kafka:9092"})
-	producer, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": kfkAddr})
+	producer, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": connectToAll})
 	if err != nil {
 		log.Panic("err connecting to kafka: ", err)
 	}
@@ -185,7 +187,7 @@ func consumer(topic string) {
 	// schemaRegistryClient.CodecCreationEnabled(false)
 
 	c, err := kafka.NewConsumer(&kafka.ConfigMap{
-		"bootstrap.servers": kfkCons,
+		"bootstrap.servers": connectToAll,
 		"group.id":          "myGroup",
 		"auto.offset.reset": "earliest",
 	})
@@ -229,7 +231,7 @@ func consumer(topic string) {
 
 func setTopic() {
 	// admin create a topic
-	a, err := kafka.NewAdminClient(&kafka.ConfigMap{"bootstrap.servers": kfkOther})
+	a, err := kafka.NewAdminClient(&kafka.ConfigMap{"bootstrap.servers": connectToAll})
 	if err != nil {
 		fmt.Printf("Failed to create Admin client: %s\n", err)
 		os.Exit(1)
