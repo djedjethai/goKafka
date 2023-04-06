@@ -7,3 +7,6 @@ connectConfluentKafkaCluster/ccloud.properties
 connectConfluentKafkaCluster/kafka
 
 confluentincWithRegistry/kafka
+
+confluentincClusterWithCompose/kafka
+confluentincClusterWithCompose/zk
