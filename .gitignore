@@ -10,3 +10,6 @@ confluentincWithRegistry/kafka
 
 confluentincClusterWithCompose/kafka
 confluentincClusterWithCompose/zk
+
+confluentincSwarm/kafka
+confluentincSwarm/zk
