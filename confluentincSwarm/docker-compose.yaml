@@ -6,6 +6,30 @@ version: '3.7'
 
 
 services:
+  producer:
+    image: djedjethai/kfkcons:0.0.4
+    command: ["producer"]
+    ports:
+      - "3000:3000"
+      #environment:
+      #kafkaURL: kafka:9092 
+      #topic: topic1
+      #GroupID: logger-group
+    depends_on:
+      schema-registry-1:
+        condition: service_healthy
+
+  consumer:
+    image: djedjethai/kfkcons:0.0.4
+    command: ["consumer"]
+      #environment:
+      #kafkaURL: kafka:9092 
+      #topic: topic1
+      #GroupID: logger-group
+    depends_on:
+      schema-registry-2:
+        condition: service_healthy
+
   zookeeper-1:
     image: confluentinc/cp-zookeeper:7.3.2
     hostname: zookeeper-1

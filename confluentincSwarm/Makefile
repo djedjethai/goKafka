@@ -1,11 +1,11 @@
 
 .PHONY: build
 build:
-	go build -o kfk .
+	cd ./app/bin && go build -o kfk ..
 
 .PHONY: compile
 compile:
-	protoc ./api/v1/proto/*.proto \
+	protoc ./app/api/v1/proto/*.proto \
 		--go_out=. \
 		--go-grpc_out=. \
 		--go_opt=paths=source_relative \
