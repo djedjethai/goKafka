@@ -1,0 +1,129 @@
+version: '3.7'
+
+# do not forget to add in /etc/hosts (see but it should work without...) 
+# 127.0.0.1 zookeeper-1 zookeeper-2 zookeeper-3
+# 127.0.0.1 kafka-1 kafka-2 kafka-3
+
+# note that all labels has been setted first
+# docker node update --label-add rabbitmq1=true node-1
+
+# create a network first
+# docker network create --driver=overlay --attachable prod 
+
+services:
+  kafka-1:
+    image: confluentinc/cp-server:7.0.1
+    hostname: kafka-1
+    user: root
+    ports:
+      - "19092:19092"
+        # depends_on: # no depends_on with swarm 
+        #   - zookeeper-1
+        #   - zookeeper-2
+        #   - zookeeper-3
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper-1:12181,zookeeper-2:22181,zookeeper-3:32181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-1:19092
+      KAFKA_JMX_HOSTNAME: "kafka-1"
+      KAFKA_JMX_PORT: 9999
+      KAFKA_JMX_OPTS: "-Djava.rmi.server.hostname=kafka-1
+      -Dcom.sun.management.jmxremote.local.only=false
+      -Dcom.sun.management.jmxremote.rmi.port=9999
+      -Dcom.sun.management.jmxremote.port=9999
+      -Dcom.sun.management.jmxremote.authenticate=false
+      -Dcom.sun.management.jmxremote.ssl=false"    
+    volumes:
+      - /root/kafkad:/var/lib/kafka/data
+      - /root/kafka:/var/log/kafka
+    healthcheck:
+      test: ["CMD", "nc", "-vz", "kafka-1", "19092"]
+      interval: 30s
+      timeout: 10s
+      retries: 4
+    networks:
+      - prod
+    deploy:
+      mode: global
+      placement:
+        constraints: [node.labels.rabbitmq1 == true]
+
+  kafka-2:
+    # image: confluentinc/cp-kafka:latest
+    image: confluentinc/cp-server:7.0.1
+    hostname: kafka-2
+    user: root
+    ports:
+      - "29092:29092"
+        #depends_on:  
+        #  - zookeeper-1
+        #  - zookeeper-2
+        #  - zookeeper-3
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper-1:12181,zookeeper-2:22181,zookeeper-3:32181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-2:29092
+      KAFKA_JMX_HOSTNAME: "kafka-2"
+      KAFKA_JMX_PORT: 9999
+      KAFKA_JMX_OPTS: "-Djava.rmi.server.hostname=kafka-2
+      -Dcom.sun.management.jmxremote.local.only=false
+      -Dcom.sun.management.jmxremote.rmi.port=9999
+      -Dcom.sun.management.jmxremote.port=9999
+      -Dcom.sun.management.jmxremote.authenticate=false
+      -Dcom.sun.management.jmxremote.ssl=false"    
+    volumes:
+      - ./kafkad:/var/lib/kafka/data
+      - ./kafka:/var/log/kafka
+    healthcheck:
+      test: ["CMD", "nc", "-vz", "kafka-2", "29092"]
+      interval: 30s
+      timeout: 10s
+      retries: 4
+    networks:
+      - prod
+    deploy:
+      mode: global
+      placement:
+        constraints: [node.labels.rabbitmq2 == true]
+
+  kafka-3:
+    # image: confluentinc/cp-kafka:latest
+    image: confluentinc/cp-server:7.0.1
+    hostname: kafka-3
+    user: root
+    ports:
+      - "39092:39092"
+        #depends_on:
+        #  - zookeeper-1
+        #  - zookeeper-2
+        #  - zookeeper-3
+    environment:
+      KAFKA_BROKER_ID: 3
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper-1:12181,zookeeper-2:22181,zookeeper-3:32181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-3:39092
+      KAFKA_JMX_HOSTNAME: "kafka-3"
+      KAFKA_JMX_PORT: 9999
+      KAFKA_JMX_OPTS: "-Djava.rmi.server.hostname=kafka-3
+      -Dcom.sun.management.jmxremote.local.only=false
+      -Dcom.sun.management.jmxremote.rmi.port=9999
+      -Dcom.sun.management.jmxremote.port=9999
+      -Dcom.sun.management.jmxremote.authenticate=false
+      -Dcom.sun.management.jmxremote.ssl=false"
+    volumes:
+      - ./kafkad:/var/lib/kafka/data
+      - ./kafka:/var/log/kafka
+    healthcheck:
+      test: ["CMD", "nc", "-vz", "kafka-3", "39092"]
+      interval: 30s
+      timeout: 10s
+      retries: 4
+    networks:
+      - prod
+    deploy:
+      mode: global
+      placement:
+        constraints: [node.labels.rabbitmq3 == true]
+
+networks:
+  prod:
+    external: true

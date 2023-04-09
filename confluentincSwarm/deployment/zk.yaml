@@ -1,0 +1,115 @@
+version: '3.7'
+
+# do not forget to add in /etc/hosts (see but it should work without...) 
+# 127.0.0.1 zookeeper-1 zookeeper-2 zookeeper-3
+# 127.0.0.1 kafka-1 kafka-2 kafka-3
+
+# note that all labels has been setted first
+# docker node update --label-add rabbitmq1=true node-1
+
+services:
+  zookeeper-1:
+    image: confluentinc/cp-zookeeper:7.3.2
+    hostname: zookeeper-1
+    user: root
+    ports:
+      - "12181:12181"
+    environment:
+      ZOOKEEPER_SERVER_ID: 1
+      ZOOKEEPER_CLIENT_PORT: 12181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
+      ZOOKEEPER_SERVERS: zookeeper-1:12888:13888;zookeeper-2:22888:23888;zookeeper-3:32888:33888
+    volumes:
+      - /root/zkd:/var/lib/zookeeper/data
+      - /root/zk:/var/lib/zookeeper/log
+    healthcheck:
+      test: ["CMD", "nc", "-vz", "zookeeper-1", "12181"]
+      interval: 30s
+      timeout: 10s
+      retries: 4
+    networks:
+      - prod
+    deploy:
+      mode: global
+      placement:
+        constraints: [node.labels.rabbitmq1 == true]
+
+  zookeeper-2:
+    image: confluentinc/cp-zookeeper:7.3.2
+    hostname: zookeeper-2
+    user: root
+    ports:
+      - "22181:22181"
+    environment:
+      ZOOKEEPER_SERVER_ID: 2
+      ZOOKEEPER_CLIENT_PORT: 22181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
+      ZOOKEEPER_SERVERS: zookeeper-1:12888:13888;zookeeper-2:22888:23888;zookeeper-3:32888:33888
+    volumes:
+      - /root/zkd:/var/lib/zookeeper/data
+      - /root/zk:/var/lib/zookeeper/log
+    healthcheck:
+      test: ["CMD", "nc", "-vz", "zookeeper-2", "22181"]
+      interval: 30s
+      timeout: 10s
+      retries: 4
+    networks:
+      - prod
+    deploy:
+      mode: global
+      placement:
+        constraints: [node.labels.rabbitmq2 == true]
+
+  zookeeper-3:
+    image: confluentinc/cp-zookeeper:7.3.2
+    hostname: zookeeper-3
+    user: root
+    ports:
+      - "32181:32181"
+    environment:
+      ZOOKEEPER_SERVER_ID: 3
+      ZOOKEEPER_CLIENT_PORT: 32181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
+      ZOOKEEPER_SERVERS: zookeeper-1:12888:13888;zookeeper-2:22888:23888;zookeeper-3:32888:33888
+    volumes:
+      - /root/zkd:/var/lib/zookeeper/data
+      - /root/zk:/var/lib/zookeeper/log
+    healthcheck:
+      test: ["CMD", "nc", "-vz", "zookeeper-3", "32181"]
+      interval: 30s
+      timeout: 10s
+      retries: 4
+    networks:
+      - prod
+    deploy:
+      mode: global
+      placement:
+        constraints: [node.labels.rabbitmq3 == true]
+
+  kafka_manager:
+    image: hlebalbau/kafka-manager:stable
+    ports:
+      - "9000:9000"
+    user: root
+    networks:
+      - prod
+    environment:
+      ZK_HOSTS: "zookeeper-1:12181,zookeeper-2:22181,zookeeper-3:32181"
+      APPLICATION_SECRET: "random-secret"
+    command: -Dpidfile.path=/dev/null
+    volumes:
+      - ./kafkam:/kafka-manager/logs
+    deploy:
+      mode: global
+      placement:
+        constraints: [node.labels.rabbitmq2 == true]
+
+networks:
+  prod:
+    external: true

@@ -1,0 +1,99 @@
+version: '3.7'
+
+# do not forget to add in /etc/hosts (see but it should work without...) 
+# 127.0.0.1 zookeeper-1 zookeeper-2 zookeeper-3
+# 127.0.0.1 kafka-1 kafka-2 kafka-3
+
+# note that all labels has been setted first
+# docker node update --label-add rabbitmq1=true node-1
+
+# create a network first
+# docker network create --driver=overlay --attachable prod 
+
+services:
+  
+  schema-registry-1:
+    image: confluentinc/cp-schema-registry:7.1.0
+    hostname: schema-registry-1
+    user: root
+    depends_on:
+      - kafka-1
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry-1
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'kafka-1:19092,kafka-2:29092,kafka-3:39092'
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    healthcheck:
+      test: nc -z localhost 8081 || exit -1 
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    volumes:
+      - /root/registry:/etc/schema-registry
+    networks:
+      - prod
+    deploy:
+      mode: global
+      placement:
+        constraints: [node.labels.rabbitmq1 == true]
+
+  schema-registry-2:
+    image: confluentinc/cp-schema-registry:7.1.0
+    hostname: schema-registry-2
+    user: root
+    depends_on:
+      - kafka-2
+    ports:
+      - "8082:8082"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry-2
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'kafka-1:19092,kafka-2:29092,kafka-3:39092'
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8082
+    healthcheck:
+      test: nc -z localhost 8082 || exit -1 
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    volumes:
+      - /root/registry:/etc/schema-registry
+    networks:
+      - prod
+    deploy:
+      mode: global
+      placement:
+        constraints: [node.labels.rabbitmq2 == true]
+
+  schema-registry-3:
+    image: confluentinc/cp-schema-registry:7.1.0
+    hostname: schema-registry-3
+    user: root
+    depends_on:
+      - kafka-3
+    ports:
+      - "8083:8083"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry-3
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'kafka-1:19092,kafka-2:29092,kafka-3:39092'
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8083
+    healthcheck:
+      test: nc -z localhost 8083 || exit -1 
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    volumes:
+      - /root/registry:/etc/schema-registry
+    networks:
+      - prod
+    deploy:
+      mode: global
+      placement:
+        constraints: [node.labels.rabbitmq3 == true]
+
+networks:
+  prod:
+    external: true
+

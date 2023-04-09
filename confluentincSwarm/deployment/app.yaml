@@ -1,0 +1,31 @@
+version: '3.7'
+
+# do not forget to add in /etc/hosts (see but it should work without...) 
+# 127.0.0.1 zookeeper-1 zookeeper-2 zookeeper-3
+# 127.0.0.1 kafka-1 kafka-2 kafka-3
+
+# note that all labels has been setted first
+# docker node update --label-add rabbitmq1=true node-1
+
+# create a network first
+# docker network create --driver=overlay --attachable prod 
+
+services:
+  producer:
+    image: djedjethai/kfkcons:0.0.4
+    command: ["producer"]
+    ports:
+      - "3000:3000"
+    networks:
+      - prod
+
+  consumer:
+    image: djedjethai/kfkcons:0.0.4
+    command: ["consumer"]
+    networks:
+      - prod
+
+networks:
+  prod:
+    external: true
+
