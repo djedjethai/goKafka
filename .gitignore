@@ -13,3 +13,5 @@ confluentincClusterWithCompose/zk
 
 confluentincSwarm/kafka
 confluentincSwarm/zk
+
+configuration/kafka
