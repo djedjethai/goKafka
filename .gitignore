@@ -15,3 +15,5 @@ confluentincSwarm/kafka
 confluentincSwarm/zk
 
 configuration/kafka
+
+writingMessages/kafka
