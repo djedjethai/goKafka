@@ -55,6 +55,13 @@ services:
       CONFLUENT_METRICS_ENABLE: 'false'
       CONFLUENT_SUPPORT_CUSTOMER_ID: 'anonymous'
       CONFLUENT_REPORTERS_TELEMETRY_AUTO_ENABLE: "false"
+      # config specific to consumer
+      KAFKA_FETCH_MIN_BYTES: 1024 # default is 1
+      KAFKA_FETCH_MAX_WAIT_MS: 100 # default is 500
+      KAFKA_MAX_PARTITION_FETCH_BYTES: 1048576 # that the default
+      KAFKA_SESSION_TIMEOUT_MS: 6000
+      KAFKA_SOCKET_RECEIVE_BUFFER_BYTES: -1
+      KAFKA_SOCKET_SEND_BUFFER_BYTES: -1
     healthcheck:
       test: ["CMD", "nc", "-vz", "localhost", "9092"]
       interval: 30s

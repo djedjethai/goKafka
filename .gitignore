@@ -17,3 +17,5 @@ confluentincSwarm/zk
 configuration/kafka
 
 writingMessages/kafka
+
+consumeMessages/kafka
