@@ -233,72 +233,62 @@ func consumer(topic string) {
 	defer c.Close()
 
 	c.SubscribeTopics([]string{topic}, myRebalanceCallback)
+	// c.SubscribeTopics([]string{topic}, nil)
 
 	run := true
 
+	// Handle unexpected shutdown
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 
-	messageCount := 0
+	// Start a goroutine to handle the signals
+	go func(*kafka.Consumer) {
+		// Block until a signal is received
+		sig := <-signals
+		fmt.Println("Received signal:", sig)
 
-	for run == true {
-		select {
-		case sig := <-signals:
-			fmt.Printf("Caught signal %v: terminating\n", sig)
+		// Perform any necessary cleanup or shutdown operations
+		commitOffsets(c)
 
-			commitOffsets(c)
-			// os.Exit(0)
-			run = false
-		default:
-			ev := c.Poll(100)
-			if ev == nil {
-				continue
+		// Exit the program gracefully
+		os.Exit(0)
+	}(c)
+
+	var messageCount int
+
+	for run {
+		// fmt.Printf("Received message !!!!!!!!! : %s\n", string(e.Value))
+		record, err := c.ReadMessage(-1)
+		if err == nil {
+
+			// sensorReading := &pb.SensorReading{}
+			msg := &pb.Person{}
+			// err = proto.Unmarshal(record.Value[7:], sensorReading)
+			err = proto.Unmarshal(record.Value[7:], msg)
+			if err != nil {
+				panic(fmt.Sprintf("Error deserializing the record: %s", err))
 			}
 
-			// log.Print("see the event::::: ", ev)
-			switch e := ev.(type) {
-			case *kafka.Message:
-				// fmt.Printf("Received message !!!!!!!!! : %s\n", string(e.Value))
-				record, err := c.ReadMessage(-1)
-				if err == nil {
+			fmt.Println("")
+			fmt.Printf("Message on %s: %s\n", record.TopicPartition, string(record.Value))
 
-					// sensorReading := &pb.SensorReading{}
-					msg := &pb.Person{}
-					// err = proto.Unmarshal(record.Value[7:], sensorReading)
-					err = proto.Unmarshal(record.Value[7:], msg)
-					if err != nil {
-						panic(fmt.Sprintf("Error deserializing the record: %s", err))
-					}
-
-					fmt.Println("")
-					fmt.Printf("Message on %s: %s\n", record.TopicPartition, string(record.Value))
-
-					// here we will commit "async" each 5 message
-					messageCount++
-					if messageCount%commitBatchSize == 0 {
-						go commitOffsets(c)
-					}
-
-					// go func() {
-					// 	_, err := c.CommitMessage(record)
-					// 	if err != nil {
-					// 		fmt.Printf("Failed to commit offset: %s\n", err)
-					// 		// Handle the error accordingly
-					// 	}
-					// }()
-				}
-
-			case kafka.PartitionEOF:
-				fmt.Printf("Reached end of partition %v\n", e.Partition)
-			case kafka.Error:
-				fmt.Fprintf(os.Stderr, "Error: %v\n", e)
-				commitOffsets(c)
-				run = false
+			// here we will commit "async" each 5 message
+			messageCount++
+			if messageCount%commitBatchSize == 0 {
+				go commitOffsets(c)
 			}
 
+			// go func() {
+			// 	_, err := c.CommitMessage(record)
+			// 	if err != nil {
+			// 		fmt.Printf("Failed to commit offset: %s\n", err)
+			// 		// Handle the error accordingly
+			// 	}
+			// }()
+		} else {
+			log.Println("The error from c.ReadMessage is not nil: ", err)
 		}
 	}
-
 }
 
 func commitOffsets(c *kafka.Consumer) {
