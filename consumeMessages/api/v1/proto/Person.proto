@@ -17,4 +17,9 @@ message Test{
 	string text = 1;
 }
 
+message Data {
+	string name = 1;
+	int64 offset = 2; 
+}
+
 
