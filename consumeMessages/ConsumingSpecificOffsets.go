@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -275,7 +276,6 @@ func consumer(topic string) {
 		// Handle the cleanup tasks before shut down
 		// like close connection to the db
 		close(writeCH)
-		// close(readCH)
 
 		// Exit the program gracefully
 		os.Exit(0)
@@ -443,7 +443,81 @@ func stringToTopicPartition(str string) kafka.TopicPartition {
 	return topicPartition
 }
 
+// retry logic
+type kafkaCommitment func(
+	context.Context,
+	*kafka.Consumer,
+	[]kafka.TopicPartition,
+	int,
+) ([]kafka.TopicPartition, error)
+
+func commitOffsetsWrapper(ctx context.Context, c *kafka.Consumer, listOffsets []kafka.TopicPartition, useless int) ([]kafka.TopicPartition, error) {
+	return c.CommitOffsets(listOffsets)
+}
+
+func committedWrapper(ctx context.Context, c *kafka.Consumer, listPartitions []kafka.TopicPartition, delayToWait int) ([]kafka.TopicPartition, error) {
+
+	return c.Committed(listPartitions, delayToWait)
+}
+
+func retry(kfkFunc kafkaCommitment, retry int, delay time.Duration) kafkaCommitment {
+	return func(ctx context.Context, c *kafka.Consumer, ktp []kafka.TopicPartition, d int) ([]kafka.TopicPartition, error) {
+		for r := 0; ; r++ {
+			respKpt, err := kfkFunc(ctx, c, ktp, d)
+			if err == nil || r >= retry {
+				return respKpt, err
+			}
+
+			log.Printf("Attempt %d failed; retrying in %v", r+1, delay)
+
+			select {
+			case <-time.After(delay):
+			case <-ctx.Done():
+				return []kafka.TopicPartition{}, errors.New("Cannot get response")
+			}
+		}
+	}
+}
+
+// end retry logic
+
+// helper
+func helperCommitOffsets(ctx context.Context, c *kafka.Consumer, tps []kafka.TopicPartition, refX kafka.TopicPartition, retryCommitOffsets kafkaCommitment) {
+
+	log.Println("helper see tps: ", tps, " - ", refX)
+
+	// commit all TopicPartition between the last commited and last saved in db
+	var diff int64 = 0
+	if len(tps) > 0 && int64(tps[0].Offset) < int64(refX.Offset) {
+		diff = int64(refX.Offset) - int64(tps[0].Offset)
+	}
+
+	fmt.Println("see the diff length: ", diff)
+
+	// TODO and what if there is a single event on a partition...
+	// then diff will be 0..... fix this...
+	if diff > 0 {
+		listOffsets := []kafka.TopicPartition{}
+		for i := 0; i < int(diff); i++ {
+			tps[0].Offset = kafka.Offset(int64(tps[0].Offset) + int64(1))
+			listOffsets = append(listOffsets, tps[0])
+		}
+		fmt.Println("See the list of offset to commit: ", listOffsets)
+
+		// commit all the offsets to kafka
+		// commited, err := c.CommitOffsets(listOffsets)
+		commited, err := retryCommitOffsets(ctx, c, listOffsets, 0)
+		if err == nil {
+			fmt.Println("See commited offsets' list: ", commited)
+		} else {
+			log.Println("Error commited listOffsets: ", err)
+		}
+	}
+}
+
 func seekPartitions(c *kafka.Consumer) {
+	ctx := context.Background()
+
 	// get current partitions
 	topicPartitions, err := c.Assignment()
 	if err != nil {
@@ -495,14 +569,32 @@ func seekPartitions(c *kafka.Consumer) {
 		log.Println("Err assigning TopicPartitions: ", err)
 	}
 
+	retryCommitted := retry(committedWrapper, 3, time.Second*10)
+	retryCommitOffsets := retry(commitOffsetsWrapper, 6, time.Second*10)
+
 	// seek() on each partition only if the partition offest is not 0
 	if int64(ref0.Offset) != int64(0) {
 		fmt.Println("in 0: ", ref0)
+
+		// commit the partition first to make sure kafka won't rebalance dor any reason,
+		// which may create a re-play of the even, even we seek()
+		// tps, err := c.Committed([]kafka.TopicPartition{ref0}, 5000)
+		tps, err := retryCommitted(ctx, c, []kafka.TopicPartition{ref0}, 100)
+		if err != nil {
+			fmt.Println("Err commit uncommited offsets at part0: ", err)
+		}
+
+		fmt.Println("see commit at 0: ", tps)
+
+		helperCommitOffsets(ctx, c, tps, ref0, retryCommitOffsets)
+
 		// set the offset to the next one
 		// as we do not want to reprocess an already recorded event
 		ref0.Offset = kafka.Offset(int64(ref0.Offset) + int64(1))
 
-		err := c.Seek(ref0, 10)
+		log.Println("ref0 last offset increased: ", ref0)
+
+		err = c.Seek(ref0, 100)
 		if err != nil {
 			fmt.Println("Seek error 0: ", err)
 		}
@@ -510,9 +602,21 @@ func seekPartitions(c *kafka.Consumer) {
 	if int64(ref1.Offset) != int64(0) {
 		fmt.Println("in 1: ", ref1)
 
+		// tps, err := c.Committed([]kafka.TopicPartition{ref1}, 5000)
+		tps, err := retryCommitted(ctx, c, []kafka.TopicPartition{ref1}, 100)
+		if err != nil {
+			fmt.Println("Err commit uncommited offsets at part1: ", err)
+		}
+
+		fmt.Println("see commit at 1: ", tps)
+
+		helperCommitOffsets(ctx, c, tps, ref1, retryCommitOffsets)
+
 		ref1.Offset = kafka.Offset(int64(ref1.Offset) + int64(1))
 
-		err := c.Seek(ref1, 10)
+		log.Println("ref1 last offset increased: ", ref1)
+
+		err = c.Seek(ref1, 100)
 		if err != nil {
 			fmt.Println("Seek error 1: ", err)
 		}
@@ -520,9 +624,21 @@ func seekPartitions(c *kafka.Consumer) {
 	if int64(ref2.Offset) != int64(0) {
 		fmt.Println("in 2: ", ref2)
 
+		// tps, err := c.Committed([]kafka.TopicPartition{ref2}, 5000)
+		tps, err := retryCommitted(ctx, c, []kafka.TopicPartition{ref2}, 100)
+		if err != nil {
+			fmt.Println("Err commit uncommited offsets at part2: ", err)
+		}
+
+		fmt.Println("see commit at 2: ", tps)
+
+		helperCommitOffsets(ctx, c, tps, ref2, retryCommitOffsets)
+
 		ref2.Offset = kafka.Offset(int64(ref2.Offset) + int64(1))
 
-		err := c.Seek(ref2, 10)
+		log.Println("ref2 last offset increased: ", ref2)
+
+		err = c.Seek(ref2, 10)
 		if err != nil {
 			fmt.Println("Seek error 2: ", err)
 		}
@@ -530,13 +646,30 @@ func seekPartitions(c *kafka.Consumer) {
 	if int64(ref3.Offset) != int64(0) {
 		fmt.Println("in 3: ", ref3)
 
+		// TODO this big block should be a separate func(will use in each partition)
+
+		// get the last commited TopicPartition
+		// tps, err := c.Committed([]kafka.TopicPartition{ref3}, 50000)
+		tps, err := retryCommitted(ctx, c, []kafka.TopicPartition{ref3}, 100)
+		if err != nil {
+			fmt.Println("Err commit uncommited offsets at part3: ", err)
+		}
+
+		fmt.Println("see commit at 3: ", tps)
+
+		helperCommitOffsets(ctx, c, tps, ref3, retryCommitOffsets)
+
 		ref3.Offset = kafka.Offset(int64(ref3.Offset) + int64(1))
 
-		err := c.Seek(ref3, 10)
+		log.Println("ref3 last offset increased: ", ref3)
+
+		err = c.Seek(ref3, 10)
 		if err != nil {
 			fmt.Println("Seek error 3: ", err)
 		}
 	}
+
+	time.Sleep(time.Second * 15)
 }
 
 // database = append(database, Data{data})
