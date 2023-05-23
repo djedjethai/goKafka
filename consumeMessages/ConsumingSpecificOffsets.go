@@ -482,12 +482,32 @@ func retry(kfkFunc kafkaCommitment, retry int, delay time.Duration) kafkaCommitm
 // end retry logic
 
 // helper
-func helperCommitOffsets(ctx context.Context, c *kafka.Consumer, tps []kafka.TopicPartition, refX kafka.TopicPartition, retryCommitOffsets kafkaCommitment) {
+func helperCommitOffsets(ctx context.Context, c *kafka.Consumer, refX kafka.TopicPartition, retryCommitOffsets, retryCommitted kafkaCommitment) {
+
+	// commit the partition first to make sure kafka won't rebalance dor any reason,
+	// which may create a re-play of the even, even we seek()
+	// tps, err := c.Committed([]kafka.TopicPartition{ref0}, 5000)
+	tps, err := retryCommitted(ctx, c, []kafka.TopicPartition{refX}, 100)
+	if err != nil {
+		fmt.Println("Err commit uncommited offsets at part0: ", err)
+	}
+
+	fmt.Println("see commit at 0: ", tps)
 
 	log.Println("helper see tps: ", tps, " - ", refX)
 
 	// commit all TopicPartition between the last commited and last saved in db
 	var diff int64 = 0
+	ofs := int64(tps[0].Offset)
+	log.Println("see the position: ", ofs)
+	if ofs < 0 {
+		// we don't want to re-commit 4000 events
+		if int64(refX.Offset) < 20 {
+			tps[0].Offset = kafka.Offset(0)
+		} else {
+			tps[0].Offset = kafka.Offset(int64(refX.Offset) - int64(20))
+		}
+	}
 	if len(tps) > 0 && int64(tps[0].Offset) < int64(refX.Offset) {
 		diff = int64(refX.Offset) - int64(tps[0].Offset)
 	}
@@ -513,6 +533,36 @@ func helperCommitOffsets(ctx context.Context, c *kafka.Consumer, tps []kafka.Top
 			log.Println("Error commited listOffsets: ", err)
 		}
 	}
+
+	// NOTE the pb here is that even I seek() to the next offsets
+	// the consumer will redisplay the last commited event...
+	// even worst, as I seek() to +1 from the commited offset
+	// kafka consumer keep this index as the record's offset
+	// but in kafka brocker it's still the real one(mean -1)
+	// ex
+	// Message on data-database[2]@14: // from kafka broker
+	// Annie
+	// Committed offsets: [data-database[2]@15] // report of commited offset
+
+	// time.Sleep(time.Second * 10)
+
+	// set the offset to the next one
+	// as we do not want to reprocess an already recorded event
+	// refX.Offset = kafka.Offset(int64(refX.Offset) + int64(1))
+
+	// log.Println("refx last offset increased: ", refX)
+
+	// err = c.Assign([]kafka.TopicPartition{refX})
+	// if err != nil {
+	// 	log.Println("Error assign() refX: ", err)
+	// }
+
+	// err = c.Seek(refX, 100)
+	// if err != nil {
+	// 	fmt.Println("Seek error refX: ", err)
+	// }
+
+	// time.Sleep(time.Second * 10)
 }
 
 func seekPartitions(c *kafka.Consumer) {
@@ -569,107 +619,35 @@ func seekPartitions(c *kafka.Consumer) {
 		log.Println("Err assigning TopicPartitions: ", err)
 	}
 
-	retryCommitted := retry(committedWrapper, 3, time.Second*10)
+	retryCommitted := retry(committedWrapper, 6, time.Second*10)
 	retryCommitOffsets := retry(commitOffsetsWrapper, 6, time.Second*10)
 
 	// seek() on each partition only if the partition offest is not 0
 	if int64(ref0.Offset) != int64(0) {
 		fmt.Println("in 0: ", ref0)
 
-		// commit the partition first to make sure kafka won't rebalance dor any reason,
-		// which may create a re-play of the even, even we seek()
-		// tps, err := c.Committed([]kafka.TopicPartition{ref0}, 5000)
-		tps, err := retryCommitted(ctx, c, []kafka.TopicPartition{ref0}, 100)
-		if err != nil {
-			fmt.Println("Err commit uncommited offsets at part0: ", err)
-		}
+		helperCommitOffsets(ctx, c, ref0, retryCommitOffsets, retryCommitted)
 
-		fmt.Println("see commit at 0: ", tps)
-
-		helperCommitOffsets(ctx, c, tps, ref0, retryCommitOffsets)
-
-		// set the offset to the next one
-		// as we do not want to reprocess an already recorded event
-		ref0.Offset = kafka.Offset(int64(ref0.Offset) + int64(1))
-
-		log.Println("ref0 last offset increased: ", ref0)
-
-		err = c.Seek(ref0, 100)
-		if err != nil {
-			fmt.Println("Seek error 0: ", err)
-		}
 	}
 	if int64(ref1.Offset) != int64(0) {
 		fmt.Println("in 1: ", ref1)
 
-		// tps, err := c.Committed([]kafka.TopicPartition{ref1}, 5000)
-		tps, err := retryCommitted(ctx, c, []kafka.TopicPartition{ref1}, 100)
-		if err != nil {
-			fmt.Println("Err commit uncommited offsets at part1: ", err)
-		}
+		helperCommitOffsets(ctx, c, ref1, retryCommitOffsets, retryCommitted)
 
-		fmt.Println("see commit at 1: ", tps)
-
-		helperCommitOffsets(ctx, c, tps, ref1, retryCommitOffsets)
-
-		ref1.Offset = kafka.Offset(int64(ref1.Offset) + int64(1))
-
-		log.Println("ref1 last offset increased: ", ref1)
-
-		err = c.Seek(ref1, 100)
-		if err != nil {
-			fmt.Println("Seek error 1: ", err)
-		}
 	}
 	if int64(ref2.Offset) != int64(0) {
 		fmt.Println("in 2: ", ref2)
 
-		// tps, err := c.Committed([]kafka.TopicPartition{ref2}, 5000)
-		tps, err := retryCommitted(ctx, c, []kafka.TopicPartition{ref2}, 100)
-		if err != nil {
-			fmt.Println("Err commit uncommited offsets at part2: ", err)
-		}
+		helperCommitOffsets(ctx, c, ref2, retryCommitOffsets, retryCommitted)
 
-		fmt.Println("see commit at 2: ", tps)
-
-		helperCommitOffsets(ctx, c, tps, ref2, retryCommitOffsets)
-
-		ref2.Offset = kafka.Offset(int64(ref2.Offset) + int64(1))
-
-		log.Println("ref2 last offset increased: ", ref2)
-
-		err = c.Seek(ref2, 10)
-		if err != nil {
-			fmt.Println("Seek error 2: ", err)
-		}
 	}
 	if int64(ref3.Offset) != int64(0) {
 		fmt.Println("in 3: ", ref3)
 
-		// TODO this big block should be a separate func(will use in each partition)
+		helperCommitOffsets(ctx, c, ref3, retryCommitOffsets, retryCommitted)
 
-		// get the last commited TopicPartition
-		// tps, err := c.Committed([]kafka.TopicPartition{ref3}, 50000)
-		tps, err := retryCommitted(ctx, c, []kafka.TopicPartition{ref3}, 100)
-		if err != nil {
-			fmt.Println("Err commit uncommited offsets at part3: ", err)
-		}
-
-		fmt.Println("see commit at 3: ", tps)
-
-		helperCommitOffsets(ctx, c, tps, ref3, retryCommitOffsets)
-
-		ref3.Offset = kafka.Offset(int64(ref3.Offset) + int64(1))
-
-		log.Println("ref3 last offset increased: ", ref3)
-
-		err = c.Seek(ref3, 10)
-		if err != nil {
-			fmt.Println("Seek error 3: ", err)
-		}
 	}
 
-	time.Sleep(time.Second * 15)
 }
 
 // database = append(database, Data{data})
