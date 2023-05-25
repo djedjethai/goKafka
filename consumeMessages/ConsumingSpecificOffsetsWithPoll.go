@@ -495,6 +495,15 @@ type kafkaCommitment func(
 	int,
 ) ([]kafka.TopicPartition, error)
 
+func assignmentWrapper(ctx context.Context, c *kafka.Consumer, listOffsets []kafka.TopicPartition, useless int) ([]kafka.TopicPartition, error) {
+	ass, err := c.Assignment()
+	if len(ass) < 1 {
+		return ass, errors.New("assignement still empty")
+	} else {
+		return ass, err
+	}
+}
+
 func commitOffsetsWrapper(ctx context.Context, c *kafka.Consumer, listOffsets []kafka.TopicPartition, useless int) ([]kafka.TopicPartition, error) {
 	return c.CommitOffsets(listOffsets)
 }
@@ -594,7 +603,7 @@ func helperCommitOffsets(ctx context.Context, c *kafka.Consumer, refX kafka.Topi
 	// as we do not want to reprocess an already recorded event
 	// refX.Offset = kafka.Offset(int64(refX.Offset) + int64(1))
 
-	// log.Println("refx last offset increased: ", refX)
+	// // log.Println("refx last offset increased: ", refX)
 
 	// err = c.Assign([]kafka.TopicPartition{refX})
 	// if err != nil {
@@ -612,8 +621,11 @@ func helperCommitOffsets(ctx context.Context, c *kafka.Consumer, refX kafka.Topi
 func seekPartitions(c *kafka.Consumer) {
 	ctx := context.Background()
 
+	retryAssignment := retry(assignmentWrapper, 10, time.Second*10)
 	// get current partitions
-	topicPartitions, err := c.Assignment()
+	// topicPartitions, err := c.Assignment()
+	// NOTE even I retry for 2mn it does not work...... look like sucks...
+	topicPartitions, err := retryAssignment(ctx, c, []kafka.TopicPartition{}, 0)
 	if err != nil {
 		log.Println("Error getting the actual partitions")
 	}
@@ -691,7 +703,6 @@ func seekPartitions(c *kafka.Consumer) {
 		helperCommitOffsets(ctx, c, ref3, retryCommitOffsets, retryCommitted)
 
 	}
-
 }
 
 // database = append(database, Data{data})
