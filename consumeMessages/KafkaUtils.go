@@ -8,8 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/google/uuid"
-	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
+	// "gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 )
 
 // TopicName holds the name of the topic, for kafka registry this is the "subject"

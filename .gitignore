@@ -19,3 +19,4 @@ configuration/kafka
 writingMessages/kafka
 
 consumeMessages/kafka
+consumeMessages/data.txt
