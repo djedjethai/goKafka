@@ -66,22 +66,22 @@ type Message struct {
 }
 
 type Data struct {
-	Name string
-	// Offset int64
+	Name   string
+	Offset int64
 }
 
 var list = []Data{
-	Data{Name: "Paul"},
-	Data{Name: "Celine"},
-	Data{Name: "Alice"},
-	Data{Name: "Berni"},
-	Data{Name: "Simon"},
-	Data{Name: "Paulux"},
-	Data{Name: "Larry"},
-	Data{Name: "Annie"},
-	Data{Name: "Zoe"},
-	Data{Name: "Charles"},
-	Data{Name: "Artur"},
+	Data{Name: "Paul", Offset: 0},
+	Data{Name: "Celine", Offset: 1},
+	Data{Name: "Alice", Offset: 2},
+	Data{Name: "Berni", Offset: 3},
+	Data{Name: "Simon", Offset: 4},
+	Data{Name: "Paulux", Offset: 6},
+	Data{Name: "Larry", Offset: 5},
+	Data{Name: "Annie", Offset: 10},
+	Data{Name: "Zoe", Offset: 8},
+	Data{Name: "Charles", Offset: 9},
+	Data{Name: "Artur", Offset: 7},
 }
 
 // const topicMessage = "message"
@@ -105,6 +105,7 @@ func main() {
 /**************************************************/
 /******************** Producer ********************/
 /**************************************************/
+// NOTE in case of a single producer producing into multi partitions,
 
 // func producer(props map[string]string, topic string) {
 func producer(topic string) {
@@ -159,8 +160,11 @@ func producer(topic string) {
 	for i := 0; i < len(list); i++ {
 
 		msg := pb.Data{
-			Name: list[i].Name,
+			Name:   list[i].Name,
+			Offset: list[i].Offset,
 		}
+
+		fmt.Println("See the data offset at producer: ", list[i].Offset)
 
 		choosen := rand.Intn(len(devices))
 		if choosen == 0 {
@@ -219,6 +223,30 @@ var partitionCnt int = 0
 
 var filePath string
 
+type DataSave struct {
+	data  Data
+	event *kafka.Message
+}
+
+type OrdersStandBy map[int64]DataSave
+
+var ordersStandBy map[int64]DataSave
+
+func recursOutOfOrderEvents(ordStd OrdersStandBy, lastEventRef *Data, writeCH chan string) bool {
+	key := lastEventRef.Offset + int64(1)
+	if v, ok := ordStd[key]; ok {
+		saveRecordToDB(v.data)
+		writeCH <- v.event.String()
+		*lastEventRef = v.data
+		delete(ordStd, key)
+		return recursOutOfOrderEvents(ordStd, lastEventRef, writeCH)
+	} else {
+		// log.Println("")
+		// log.Println("Exit recurs see: ", ordStd)
+		return true
+	}
+}
+
 // func consumer(props map[string]string, topic string) {
 func consumer(topic string) {
 	setTopic()
@@ -276,26 +304,19 @@ func consumer(topic string) {
 		os.Exit(0)
 	}(c)
 
-	// NOTE here, before Reading any message we want to position on each partition
-	// of the offset which has been saved to db.
-	// (as we don't want duplicated data neither lose some)
-	// for the sake of this ex, we use a file, which each TopicPartition string
-	// saved in it mean that the matching event's data are saved in db.
-	// !!!! In the real world, the saving of the event's data and the TopicPartition
-	// string should be in the db an should occur as a transaction.
-
 	fh, err := fileHandler(filePath)
 	if err != nil {
 		log.Println("Err from file handler: ", err)
 	}
 	defer fh.Close()
 
-	// fileReader(filePath)
-
-	// will seek() each partition to the correct offset which should be next to be proceed
-	// seekPartitions(c)
-
 	go fileWriter(fh, writeCH)
+
+	// For ordering
+	ordersStandBy = make(map[int64]DataSave)
+	// not the partition offset but the Data one
+	var lastEventRef Data = Data{Offset: int64(0)}
+	var dt Data
 
 	for run {
 		select {
@@ -317,11 +338,51 @@ func consumer(topic string) {
 					panic(fmt.Sprintf("Error deserializing the record: %s", err))
 				}
 
-				fmt.Println("")
-				fmt.Printf("Message on %s: %s\n", e.TopicPartition, string(e.Value))
-				// fmt.Println("See the message: ", msg)
+				// NOTE in case of a single producer producing to many partition
+				// use offset, means the producer index each event
+				// and the consumer consume them in order
+				// NOTE !!! if producer lose track of the Data.Offset
+				// (that it increase itselt)
+				// all is fucked up
+				// NOTE that only works for one producer to one consumer
+				// (but can use many partitions...) rebalacing won't work
+				// NOTE If the consumer crash and restart all works as expected
+				// missed events will be handles and "at most once" will be ok
+				// however an idea for keeping the order is here....
+				dt.Name = msg.Name
+				dt.Offset = msg.Offset
 
-				writeCH <- e.String()
+				if dt.Offset == 0 {
+					lastEventRef = dt
+
+					fmt.Println("")
+					fmt.Printf("Message on %s: %s\n At: %v", e.TopicPartition, string(e.Value), e.Timestamp)
+					fmt.Println("See the data offset: ", msg.Offset)
+
+					saveRecordToDB(dt)
+					writeCH <- e.String()
+				} else {
+					if dt.Offset-int64(1) == lastEventRef.Offset {
+						lastEventRef = dt
+
+						fmt.Println("")
+						fmt.Printf("Message on %s: %s\n At: %v", e.TopicPartition, string(e.Value), e.Timestamp)
+						fmt.Println("See the data offset: ", msg.Offset)
+
+						saveRecordToDB(dt)
+						writeCH <- e.String()
+
+						if len(ordersStandBy) > 0 {
+							recursOutOfOrderEvents(ordersStandBy, &lastEventRef, writeCH)
+						}
+
+					} else {
+						fmt.Println("save in orders arrays: ", dt.Offset)
+						ordersStandBy[dt.Offset] = DataSave{dt, e}
+					}
+				}
+
+				fmt.Println("The dbbbbb: ", database)
 
 				if count%commitBatchSize == 0 {
 					// NOTE, to avoid writing to db at each event
@@ -585,8 +646,8 @@ func seekPartitions(c *kafka.Consumer, topicPartitions []kafka.TopicPartition) {
 
 }
 
-func saveRecordToDB(data string) {
-	database = append(database, Data{data})
+func saveRecordToDB(data Data) {
+	database = append(database, data)
 }
 
 func commitOffsets(c *kafka.Consumer) []kafka.TopicPartition {
@@ -617,6 +678,8 @@ func myRebalanceCallback(c *kafka.Consumer, event kafka.Event) error {
 		fmt.Printf("Assigned partitions: %v\n", ev.Partitions)
 
 		seekPartitions(c, ev.Partitions)
+
+		ordersStandBy = make(map[int64]DataSave)
 
 	case kafka.RevokedPartitions:
 
