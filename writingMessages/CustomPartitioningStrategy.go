@@ -87,8 +87,10 @@ func producer(topic string) {
 	config := &kafka.ConfigMap{
 		"bootstrap.servers": "localhost:29092",
 		"client.id":         "my-producer",
-		"acks":              "all",
-		"retries":           5,
+		"acks":              "all", // means all replicas' partitions have replicated
+		// "acks":              1, means only the lead partition has recived the msg
+		// "acks":              0, do not care ack
+		"retries": 5,
 		// even the key is the same the messages will be distributed randomly among partitions
 		// "partitioner":         "random",
 		"go.delivery.reports": true,

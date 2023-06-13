@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package io.confluent.cloud.demo.domain1;
+
+option go_package = "getting-started-with-ccloud-golang/api/v1/proto";
+
+message Person {
+	string name = 1;
+	float age = 2;
+	string address = 3;
+	int32 code_postal = 4;
+	string firstname = 5;
+	Test mytest = 6;
+};
+
+message Test{
+	string text = 1;
+}
+
+message Data {
+	string name = 1;
+	int64 offset = 2; 
+}
+
+
