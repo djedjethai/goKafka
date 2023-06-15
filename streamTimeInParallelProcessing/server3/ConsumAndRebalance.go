@@ -1,12 +1,16 @@
 package main
 
 import (
+	"container/list"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	pb "getting-started-with-ccloud-golang/api/v1/proto"
+
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/golang/protobuf/proto"
 	"github.com/riferrei/srclient"
@@ -23,6 +27,7 @@ const (
 type Data struct {
 	Key  string
 	Name string
+	Ts   time.Time
 }
 
 func main() {
@@ -35,6 +40,67 @@ func main() {
 
 	consumer(topic, group)
 
+}
+
+func eventDelayWindow(events, toProcess chan Data) {
+	log.Println("Event delay window is running")
+	l := list.New()
+	timeRef := time.Time{}
+	for {
+		// set a window of 5s
+		timeRef = time.Now().Add(-5 * time.Second)
+		select {
+		case dt, ok := <-events:
+			if !ok {
+				// channel close exit
+				return
+			}
+			if dt.Key != "" && dt.Name != "" && dt.Ts != (time.Time{}) {
+				// log.Println("Valid event to be store: ", dt)
+				inserted := false
+
+				for e := l.Front(); e != nil; e = e.Next() {
+					if d, ok := e.Value.(Data); ok {
+						// if dt.Ts is before that d.TS
+						if dt.Ts.Before(d.Ts) {
+							l.InsertBefore(dt, e)
+							inserted = true
+							break
+						}
+					}
+				}
+
+				if !inserted {
+					// log.Println("PushBack event: ", dt)
+					l.PushBack(dt)
+				}
+			}
+		default:
+			// ckeck if headOfList ok return
+			if l.Len() > 0 {
+				// log.Println("See the front event element: ", l.Front().Value)
+				for e := l.Front(); e != nil; e = e.Next() {
+					if d, ok := e.Value.(Data); ok {
+						// Check if d.Ts is before timeRef
+						if d.Ts.Before(timeRef) {
+							toProcess <- d
+							_ = l.Remove(l.Front())
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+func consumeEvent(toProcess chan Data, c *kafka.Consumer) {
+	// ckeck if headOfList ok return
+
+	log.Println("Consume event is running")
+	for dt := range toProcess {
+		fmt.Println("Process event: ", dt)
+		commitOffsets(c)
+	}
 }
 
 /**************************************************/
@@ -73,12 +139,17 @@ func consumer(topic, group string) {
 	// Handle unexpected shutdown
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+	var events = make(chan Data)
+	var toProcess = make(chan Data)
 
 	// Start a goroutine to handle the signals
 	go func(*kafka.Consumer) {
 		// Block until a signal is received
 		sig := <-signals
 		fmt.Println("Received signal:", sig)
+
+		close(events)
+		close(toProcess)
 
 		// Perform any necessary cleanup or shutdown operations
 		commitOffsets(c)
@@ -87,7 +158,11 @@ func consumer(topic, group string) {
 		os.Exit(0)
 	}(c)
 
-	var messageCount int
+	// handle the delay window
+	go eventDelayWindow(events, toProcess)
+
+	// consume the event after 3s standby, making sue the late events are re-ordered
+	go consumeEvent(toProcess, c)
 
 	for run {
 
@@ -112,13 +187,14 @@ func consumer(topic, group string) {
 				}
 
 				fmt.Println("")
-				fmt.Printf("Message on %s: %s - %v \n", e.TopicPartition, string(e.Value), e.Timestamp)
-
-				// here we will commit "async" each 5 message
-				messageCount++
-				if messageCount%commitBatchSize == 0 {
-					go commitOffsets(c)
+				// fmt.Printf("Message on %s: %s - %v \n", e.TopicPartition, string(e.Value), e.Timestamp)
+				dt := Data{
+					Key:  msg.Key,
+					Name: msg.Text,
+					Ts:   e.Timestamp,
 				}
+
+				events <- dt
 
 			case kafka.Error:
 				fmt.Printf("Error: %v\n", e)
@@ -130,30 +206,6 @@ func consumer(topic, group string) {
 
 		}
 
-		// // fmt.Printf("Received message !!!!!!!!! : %s\n", string(e.Value))
-		// record, err := c.ReadMessage(-1)
-		// if err == nil {
-
-		// 	// sensorReading := &pb.SensorReading{}
-		// 	msg := &pb.Message{}
-		// 	// err = proto.Unmarshal(record.Value[7:], sensorReading)
-		// 	err = proto.Unmarshal(record.Value[7:], msg)
-		// 	if err != nil {
-		// 		panic(fmt.Sprintf("Error deserializing the record: %s", err))
-		// 	}
-
-		// 	fmt.Println("")
-		// 	fmt.Printf("Message on %s: %s - %v \n", record.TopicPartition, string(record.Value), record.Time Change with poll)
-
-		// 	// here we will commit "async" each 5 message
-		// 	messageCount++
-		// 	if messageCount%commitBatchSize == 0 {
-		// 		go commitOffsets(c)
-		// 	}
-
-		// } else {
-		// 	log.Println("The error from c.ReadMessage is not nil: ", err)
-		// }
 	}
 }
 

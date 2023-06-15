@@ -305,6 +305,7 @@ func consumer(topic string, toSrv4, toSrv3 chan Data) {
 				fmt.Printf("Message on %s: %s - %v\n", e.TopicPartition, string(e.Value), e.Timestamp)
 
 				if string(e.Key) == "2" {
+					time.Sleep(time.Second * 1)
 					log.Println("Send to serv 4::::: ", msg)
 					toSrv4 <- Data{Key: msg.Key, Name: msg.Text, Ts: e.Timestamp}
 				} else if string(e.Key) == "1" {
@@ -327,43 +328,7 @@ func consumer(topic string, toSrv4, toSrv3 chan Data) {
 			default:
 				// Ignore other event types
 			}
-
 		}
-
-		// // fmt.Printf("Received message !!!!!!!!! : %s\n", string(e.Value))
-		// record, err := c.ReadMessage(-1)
-		// if err == nil {
-
-		// 	// sensorReading := &pb.SensorReading{}
-		// 	msg := &pb.Message{}
-		// 	// err = proto.Unmarshal(record.Value[7:], sensorReading)
-		// 	err = proto.Unmarshal(record.Value[7:], msg)
-		// 	if err != nil {
-		// 		panic(fmt.Sprintf("Error deserializing the record: %s", err))
-		// 	}
-
-		// 	fmt.Println("")
-		// 	fmt.Printf("Message on %s: %s\n", record.TopicPartition, string(record.Value))
-
-		// 	if string(record.Key) == "2" {
-		// 		log.Println("Send to serv 4::::: ", msg)
-		// 		toSrv4 <- Data{Key: msg.Key, Name: msg.Text}
-		// 	} else if string(record.Key) == "1" {
-		// 		log.Println("send to serv 3:::: ", msg)
-		// 		toSrv3 <- Data{Key: msg.Key, Name: msg.Text}
-		// 	} else {
-		// 		log.Println("Error message key::: ", msg)
-		// 	}
-
-		// 	// here we will commit "async" each 5 message
-		// 	messageCount++
-		// 	if messageCount%commitBatchSize == 0 {
-		// 		go commitOffsets(c)
-		// 	}
-
-		// } else {
-		// 	log.Println("The error from c.ReadMessage is not nil: ", err)
-		// }
 	}
 }
 
