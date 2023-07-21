@@ -22,3 +22,17 @@ consumeMessages/kafka
 consumeMessages/data.txt
 
 streamTimeInParallelProcessing/kafka
+
+kafkaConnectWithAvro
+
+kafkaConnectWithString/db-data
+kafkaConnectWithString/kafka
+kafkaConnectWithString/kfk
+
+kafkaConnectWithJSON/db-data
+kafkaConnectWithJSON/kafka
+kafkaConnectWithJSON/kfk
+
+kafkaConnectWithProtobuf/db-data
+kafkaConnectWithProtobuf/kafka
+kafkaConnectWithProtobuf/kfk

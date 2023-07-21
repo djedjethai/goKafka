@@ -17,6 +17,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/riferrei/srclient"
 	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
+	// "github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
 
 const (
