@@ -14,12 +14,7 @@ import (
 
 	pb "getting-started-with-ccloud-golang/api/v1/proto"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
-	// "github.com/confluentinc/confluent-kafka-go/v2/kafka/rest"
-	// "github.com/elodina/go-kafka-avro"
-	// goavro "github.com/linkedin/goavro/v2"
 	"github.com/golang/protobuf/proto"
-	// "github.com/linkedin/goavro/v2/schema"
-	// "github.com/golang/protobuf/proto"
 	"github.com/riferrei/srclient"
 )
 
@@ -41,7 +36,7 @@ func main() {
 
 	clientMode := os.Args[1]
 	// props := LoadProperties()
-	topic := "my-topic"
+	topic := "my-topic-value"
 
 	if strings.Compare(clientMode, producerMode) == 0 {
 		// producer(props, topic)
@@ -54,11 +49,6 @@ func main() {
 			producerMode, consumerMode)
 	}
 }
-
-// type Record struct {
-// 	Name string `json:"name"`
-// 	Age  int    `json:"age"`
-// }
 
 func connectorExists(connectorName string) bool {
 	url := fmt.Sprintf("http://127.0.0.1:8083/connectors/%s", connectorName)
@@ -87,15 +77,6 @@ func connectorExists(connectorName string) bool {
 // func producer(props map[string]string, topic string) {
 func producer(topic string) {
 
-	// use kafka connect to execute the kafka connect pipeline
-	// client, err := rest.NewClient(&rest.ClientConfig{
-	// 	// URL: "http://127.0.0.1:29092",
-	// 	URL: "http://127.0.0.1:8083",
-	// })
-	// if err != nil {
-	// 	panic(fmt.Sprintf("Failed to create Kafka Connect client: %v", err))
-	// }
-
 	// taskConfig := rest.TaskConfig{
 	taskConfig := map[string]interface{}{
 		"connector.class": "com.mongodb.kafka.connect.MongoSinkConnector",
@@ -103,9 +84,10 @@ func producer(topic string) {
 		// "transforms":                   "unwrapField",
 		// "transforms.unwrapField.type":  "org.apache.kafka.connect.transforms.ExtractField$Value",
 		// "transforms.unwrapField.field": "Person",
-		"value.converter.subject.name.strategy":  "io.confluent.kafka.serializers.subject.TopicNameStrategy",
-		"transforms.unwrap.drop.invalid.message": "true",
-		"key.converter":                          "org.apache.kafka.connect.converters.ByteArrayConverter",
+		// "value.converter.subject.name.strategy":  "io.confluent.kafka.serializers.subject.TopicNameStrategy",
+		// "transforms.unwrap.drop.invalid.message": "true",
+		"key.converter.schemas.enable": "false",
+		"key.converter":                "org.apache.kafka.connect.storage.StringConverter",
 		// "key.converter.schema.registry.url":"http://schema-registry:8081",
 		"value.converter.schema.registry.url": "http://schema-registry:8081",
 		"value.converter":                     "io.confluent.connect.protobuf.ProtobufConverter",
@@ -114,9 +96,6 @@ func producer(topic string) {
 		"collection":                          "my-collection",
 		"tasksMax":                            "1",
 	}
-
-	// Create an HTTP client
-	// client := http.DefaultClient
 
 	connExist := connectorExists("my-connector")
 
@@ -245,10 +224,9 @@ func producer(topic string) {
 			Mytest:     tt,
 		}
 
-		key := "key"
+		// key := "key"
 
 		recordValue := []byte{}
-		// recordValue := []byte("that is a test de fou")
 
 		recordValue = append(recordValue, byte(0))
 		schemaIDBytes := make([]byte, 4)
@@ -259,10 +237,6 @@ func producer(topic string) {
 
 		valueBytes, _ := proto.Marshal(&msg)
 		recordValue = append(recordValue, valueBytes...)
-
-		fmt.Println("see topic: ", topic)
-		fmt.Println("see key: ", key)
-		fmt.Println("see value: ", string(recordValue))
 
 		producer.Produce(&kafka.Message{
 			TopicPartition: kafka.TopicPartition{
@@ -275,66 +249,6 @@ func producer(topic string) {
 	}
 }
 
-/**************************************************/
-/******************** Consumer ********************/
-/**************************************************/
-
-// func consumer(props map[string]string, topic string) {
-// func consumer(topic string) {
-//
-// 	setTopic()
-//
-// 	schemaRegistryClient := srclient.CreateSchemaRegistryClient("http://127.0.0.1:8081")
-//
-// 	schemaRegistryClient.CodecCreationEnabled(false)
-//
-// 	c, err := kafka.NewConsumer(&kafka.ConfigMap{
-// 		"bootstrap.servers": "127.0.0.1:29092",
-// 		"group.id":          "myGroup",
-// 		"auto.offset.reset": "earliest",
-// 	})
-// 	defer c.Close()
-//
-// 	if err != nil {
-// 		panic(err)
-// 	}
-//
-// 	// c.SubscribeTopics([]string{"myTopic", "^aRegex.*[Tt]opic"}, nil)
-//
-// 	fmt.Println("bf the subscribe topic: ", topic)
-//
-// 	c.SubscribeTopics([]string{topic}, nil)
-//
-// 	run := true
-//
-// 	fmt.Println("bf the loop")
-//
-// 	for run {
-// 		fmt.Println("grrr")
-//
-// 		record, err := c.ReadMessage(-1)
-// 		if err == nil {
-// 			// sensorReading := &pb.SensorReading{}
-// 			msg := &pb.Person{}
-// 			// err = proto.Unmarshal(record.Value[7:], sensorReading)
-// 			err = proto.Unmarshal(record.Value[7:], msg)
-// 			if err != nil {
-// 				panic(fmt.Sprintf("Error deserializing the record: %s", err))
-// 			}
-// 			fmt.Printf("Message on %s: %s\n", record.TopicPartition, string(record.Value))
-// 			fmt.Println("seeeee: ", msg)
-// 			// fmt.Println("seeeee: ", msg.Name, "-", msg.Firstname, " / ", msg.Age, " / ", msg.CodePostal, "\n", msg.Mytest.Text)
-// 			// fmt.Printf("SensorReading[device=%s, dateTime=%d, reading=%f]\n",
-// 			// 	sensorReading.Device.GetDeviceID(),
-// 			// 	sensorReading.GetDateTime(),
-// 			// 	sensorReading.GetReading())
-// 		} else if err.(kafka.Error).IsFatal() {
-// 			// fmt.Println(err)
-// 			log.Printf("Consumer error: %v \n", err)
-// 		}
-// 	}
-// }
-//
 // func setTopic() {
 // 	fmt.Println("in the set topic")
 //
