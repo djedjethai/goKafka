@@ -36,3 +36,8 @@ kafkaConnectWithJSON/kfk
 kafkaConnectWithProtobuf/db-data
 kafkaConnectWithProtobuf/kafka
 kafkaConnectWithProtobuf/kfk
+
+workWithRegistry/topicNameStrategy/
+
+workWithRegistry/topicNameStrategyOK/config
+workWithRegistry/topicNameStrategyOK/kafka
