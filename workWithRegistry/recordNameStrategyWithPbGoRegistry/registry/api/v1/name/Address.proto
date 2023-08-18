@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package v1.name;
+
+option go_package = "./api/v1/name";
+
+message Address {
+	string street = 1;
+	string city = 2;
+}
+
