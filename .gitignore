@@ -37,6 +37,8 @@ kafkaConnectWithProtobuf/db-data
 kafkaConnectWithProtobuf/kafka
 kafkaConnectWithProtobuf/kfk
 
+kafkaConnectWithProtobuf/recordNameStrategy/db-data/
+
 workWithRegistry/topicNameStrategy/kafka
 workWithRegistry/topicNameStrategy/config
 
@@ -44,6 +46,6 @@ workWithRegistry/recordNameStrategy/kafka
 workWithRegistry/recordNameStrategy/config
 workWithRegistry/recordNameStrategy/implementPackage/confluent-kafka-go
 
-
+workWithRegistry/tryServerPbGo/kafka
 
 

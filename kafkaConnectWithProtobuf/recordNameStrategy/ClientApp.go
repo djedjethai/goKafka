@@ -24,6 +24,7 @@ const (
 	schemaFile   string = "./api/v1/proto/Person.proto"
 	// schemaFile   string = "./api/v1/proto/SensorReading.proto"
 	// messageFile  string = "./api/v1/proto/Message.proto"
+	subjectName = "io.confluent.cloud.demo.domain1.Person-value"
 )
 
 type Message struct {
@@ -79,24 +80,17 @@ func producer(topic string) {
 
 	// taskConfig := rest.TaskConfig{
 	taskConfig := map[string]interface{}{
-		"connector.class": "com.mongodb.kafka.connect.MongoSinkConnector",
-		"topics":          "my-topic",
-		// "transforms":                   "unwrapField",
-		// "transforms.unwrapField.type":  "org.apache.kafka.connect.transforms.ExtractField$Value",
-		// "transforms.unwrapField.field": "Person",
-		// "value.converter.subject.name.strategy":  "io.confluent.kafka.serializers.subject.TopicNameStrategy",
-		// "transforms.unwrap.drop.invalid.message": "true",
-		"key.converter.schemas.enable": "false",
-		"key.converter":                "org.apache.kafka.connect.storage.StringConverter",
-		// "key.converter.schema.registry.url":"http://schema-registry:8081",
+		"connector.class":                       "com.mongodb.kafka.connect.MongoSinkConnector",
+		"topics":                                "my-topic",
+		"key.converter.schemas.enable":          "false",
+		"key.converter":                         "org.apache.kafka.connect.storage.StringConverter",
 		"value.converter.schema.registry.url":   "http://schema-registry:8081",
 		"value.converter":                       "io.confluent.connect.protobuf.ProtobufConverter",
-		"value.converter.subject.name.strategy": "io.confluent.kafka.serializers.subject.TopicRecordNameStrategy",
-		// "value.converter.schema.name":           "io.confluent.cloud.demo.domain1.Person",
-		"connection.uri": "mongodb://mongo:27017",
-		"database":       "my-database",
-		"collection":     "my-collection",
-		"tasksMax":       "1",
+		"value.converter.subject.name.strategy": "io.confluent.kafka.serializers.subject.RecordNameStrategy",
+		"connection.uri":                        "mongodb://mongo:27017",
+		"database":                              "my-database",
+		"collection":                            "my-collection",
+		"tasksMax":                              "1",
 	}
 
 	connExist := connectorExists("my-connector")
@@ -171,7 +165,7 @@ func producer(topic string) {
 
 	schemaRegistryClient := srclient.CreateSchemaRegistryClient(schemaRegistryURL)
 
-	schema, err := schemaRegistryClient.GetLatestSchema(topic)
+	schema, err := schemaRegistryClient.GetLatestSchema(subjectName)
 	if err != nil {
 		fmt.Println("Error retrieving schema: ", err)
 	}
@@ -210,7 +204,6 @@ func producer(topic string) {
 		// 	string town = 2;
 		// }`
 
-		subjectName := "io.confluent.cloud.demo.domain1.Person-value"
 		// subjectName1 := "io.confluent.cloud.demo.domain1.Address-value"
 
 		// define 2 schema on the same topic
@@ -224,7 +217,7 @@ func producer(topic string) {
 
 	for {
 
-		tt := &pb.Test{Text: "this a is a good test"}
+		// tt := &pb.Test{Text: "this a is a good test"}
 
 		msg := pb.Person{
 			Name:       "robert",
@@ -232,7 +225,7 @@ func producer(topic string) {
 			Address:    "the address",
 			CodePostal: 10111,
 			Firstname:  "simon",
-			Mytest:     tt,
+			// Mytest:     tt,
 		}
 
 		// key := "key"

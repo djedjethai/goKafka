@@ -1,0 +1,9 @@
+package proto
+
+type Person struct{
+	Name string
+	Age float32
+}
+func (x *Person) ProtoMessage() {} 
+func (x *Person) Reset() {}
+func (x *Person) String() string {return ""}
