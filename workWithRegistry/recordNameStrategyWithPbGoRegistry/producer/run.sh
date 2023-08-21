@@ -1,8 +1,8 @@
 #!/bin/bash
 
 cd ./loadPbFiles
-go build -o pbfiles .
-./pbfiles
+go build -o loader .
+./loader
 
 cd ../producerRun
 go build -o kfk .

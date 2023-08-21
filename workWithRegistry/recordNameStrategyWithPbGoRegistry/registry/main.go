@@ -102,7 +102,7 @@ func v1NameProtobuf(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("the name: ", name)
 
 	switch name {
-	case "person", "name":
+	case "person", "address":
 		name = fmt.Sprintf("%s.pb.go", capitalize(name))
 		pathToReadFrom, err := setPathToReadFrom(v1Name, name)
 		if err != nil {
