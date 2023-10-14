@@ -33,9 +33,13 @@ kafkaConnectWithJSON/db-data
 kafkaConnectWithJSON/kafka
 kafkaConnectWithJSON/kfk
 
-kafkaConnectWithProtobuf/db-data
-kafkaConnectWithProtobuf/kafka
-kafkaConnectWithProtobuf/kfk
+kafkaConnectWithProtobuf/recordNameStrategy/db-data
+kafkaConnectWithProtobuf/recordNameStrategy/kafka
+kafkaConnectWithProtobuf/recordNameStrategy/kfk
+
+kafkaConnectWithProtobuf/topicNameStrategy/db-data
+kafkaConnectWithProtobuf/topicNameStrategy/kafka
+kafkaConnectWithProtobuf/topicNameStrategy/kfk
 
 kafkaConnectWithProtobuf/recordNameStrategy/db-data/
 
