@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	"encoding/binary"
+	// "encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -14,8 +14,9 @@ import (
 
 	pb "getting-started-with-ccloud-golang/api/v1/proto"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
-	"github.com/golang/protobuf/proto"
-	"github.com/riferrei/srclient"
+	schemaregistry "github.com/djedjethai/gokfk-regent"
+	"github.com/djedjethai/gokfk-regent/serde"
+	"github.com/djedjethai/gokfk-regent/serde/protobuf"
 )
 
 const (
@@ -167,48 +168,16 @@ func producer(topic string) {
 
 	schemaRegistryURL := "http://127.0.0.1:8081"
 
-	schemaRegistryClient := srclient.CreateSchemaRegistryClient(schemaRegistryURL)
+	// schemaRegistryClient := srclient.CreateSchemaRegistryClient(schemaRegistryURL)
 
-	schema, err := schemaRegistryClient.GetLatestSchema(topic)
+	c, err := schemaregistry.NewClient(schemaregistry.NewConfig(schemaRegistryURL))
 	if err != nil {
-		fmt.Println("Error retrieving schema: ", err)
+		log.Fatal("Error schemaRegistry create new client: ", err)
 	}
 
-	// 	// // !!! if I need to update the shema version => recreate the schema
-	// // what ever the changement in the schema, at the time it's recreated
-	// // the old schema is replaced by the new one and version increase +1
-	// // !!! BUT !!! already registered fields can not be modify(can add fields only)
-	schema = nil
-	if schema == nil {
-		// var b bool = false
-		// schemaBytes, _ := ioutil.ReadFile(schemaFile)
-
-		schemaBytes := `
-			syntax = "proto3";
-
-			package io.confluent.cloud.demo.domain1;
-
-			option go_package = "getting-started-with-ccloud-golang/api/v1/proto";
-
-			message Person {
-				string name = 1;
-				float age = 2;
-				string address = 3;
-				int32 code_postal = 4;
-				string firstname = 5;
-				Test mytest = 6;
-			};
-
-			message Test{
-				string text = 1;
-			}`
-
-		// Test mytest = 6;
-		schema, err = schemaRegistryClient.CreateSchema(fmt.Sprintf("%v-value", topic), string(schemaBytes), "PROTOBUF")
-		if err != nil {
-			panic(fmt.Sprintf("Error creating the schema %s", err))
-		}
-		fmt.Println("look like schema has been created...")
+	s, err := protobuf.NewSerializer(c, serde.ValueSerde, protobuf.NewSerializerConfig())
+	if err != nil {
+		log.Fatal("Error creating the serializer: ", err)
 	}
 
 	for {
@@ -216,33 +185,38 @@ func producer(topic string) {
 		tt := &pb.Test{Text: "this a is a good test"}
 
 		msg := pb.Person{
-			Name:       "robert",
-			Age:        23,
+			Name:       "Alice",
+			Age:        47,
 			Address:    "the address",
-			CodePostal: 10111,
-			Firstname:  "simon",
+			CodePostal: 20222,
+			Firstname:  "AAA",
 			Mytest:     tt,
 		}
 
-		// key := "key"
+		kafkaChan := make(chan kafka.Event)
+		defer close(kafkaChan)
 
-		recordValue := []byte{}
+		payload, err := s.Serialize(topic, &msg)
+		if err != nil {
 
-		recordValue = append(recordValue, byte(0))
-		schemaIDBytes := make([]byte, 4)
-		binary.BigEndian.PutUint32(schemaIDBytes, uint32(schema.ID()))
-		recordValue = append(recordValue, schemaIDBytes...)
-		messageIndexBytes := []byte{byte(2), byte(0)}
-		recordValue = append(recordValue, messageIndexBytes...)
+		}
 
-		valueBytes, _ := proto.Marshal(&msg)
-		recordValue = append(recordValue, valueBytes...)
-
-		producer.Produce(&kafka.Message{
-			TopicPartition: kafka.TopicPartition{
-				Topic: &topic, Partition: kafka.PartitionAny},
-			Value: recordValue}, nil)
-		// Key: []byte(key), Value: recordValue}, nil)
+		if err = producer.Produce(&kafka.Message{
+			TopicPartition: kafka.TopicPartition{Topic: &topic},
+			Value:          payload,
+		}, kafkaChan); err != nil {
+			fmt.Println("Error producing the message: ", err)
+			// return nullOffset, err
+		}
+		e := <-kafkaChan
+		switch ev := e.(type) {
+		case *kafka.Message:
+			log.Println("message sent: ", string(ev.Value))
+			// return int64(ev.TopicPartition.Offset), nil
+		case kafka.Error:
+			log.Println("Kafka error: ", err)
+			// return nullOffset, err
+		}
 
 		time.Sleep(1000 * time.Millisecond)
 		fmt.Println("sent....")
