@@ -33,6 +33,8 @@ kafkaConnectWithJSON/db-data
 kafkaConnectWithJSON/kafka
 kafkaConnectWithJSON/kfk
 
+workWithRegistry/recordNameStrategy/implementPackage/confluent-kafka-go
+
 kafkaConnectWithProtobuf/recordNameStrategy/db-data
 kafkaConnectWithProtobuf/recordNameStrategy/kafka
 kafkaConnectWithProtobuf/recordNameStrategy/kfk
