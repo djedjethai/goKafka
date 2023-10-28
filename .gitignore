@@ -23,7 +23,8 @@ consumeMessages/data.txt
 
 streamTimeInParallelProcessing/kafka
 
-kafkaConnectWithAvro
+kafkaConnectWithAvro/db-data
+kafkaConnectWithAvro/kafka
 
 kafkaConnectWithString/db-data
 kafkaConnectWithString/kafka
