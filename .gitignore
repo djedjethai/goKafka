@@ -56,5 +56,4 @@ workWithRegistry/recordNameStrategy/implementPackage/confluent-kafka-go
 workWithRegistry/tryServerPbGo/kafka
 
 connectWithTLS/kafka
-connectWithTLS/paris/kafka
-connectWithTLS/paris/api
+connectWithTLS/secrets
