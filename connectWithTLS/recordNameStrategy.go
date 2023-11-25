@@ -29,7 +29,7 @@ const (
 	nullOffset          = -1
 	topic               = "my-topic"
 	// kafkaURL                     = "127.0.0.1:29092"
-	kafkaURL                     = "127.0.0.1:9093"
+	kafkaURL                     = "127.0.0.1:29093"
 	srURL                        = "http://127.0.0.1:8081"
 	schemaFile            string = "./api/v1/proto/Person.proto"
 	consumerGroupID              = "test-consumer"

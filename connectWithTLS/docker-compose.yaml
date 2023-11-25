@@ -16,16 +16,19 @@ services:
     volumes:
       - ./kafka/zk-data:/var/lib/zookeeper/data
       - ./kafka/zk-logs:/var/lib/zookeeper/log  
+    networks:
+      - kafka-network
 
-  kafka-ssl:
+  broker:
     # image: confluentinc/cp-server:7.0.1
     image: confluentinc/cp-kafka:7.1.10
-    container_name: kafka-ssl
-    hostname: kafka-ssl
+    container_name: broker
+    hostname: broker
     user: root
     ports:
-      - "9092:9092"
+      # - "9092:9092"
       - "9093:9093"
+      - "29093:29093"
     depends_on:
       - zookeeper
     environment:
@@ -33,8 +36,13 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
         # that for the kfk controller to connect as there is only one brocker 
         # it become the controller by default, so should connect to himeself, so localhost...
-        # KAFKA_ADVERTISED_LISTENERS: 'SSL://kafka-ssl:9093' 
-      KAFKA_ADVERTISED_LISTENERS: 'SSL://localhost:9093'
+        # KAFKA_ADVERTISED_LISTENERS: SSL://broker:9093 # then app on localhost can not connect
+        # works for app running on localhost but then SR can not connect.....
+        # KAFKA_ADVERTISED_LISTENERS: SSL://localhost:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: |
+        SSL:SSL,SSL_PLAINTEXT:SSL
+      KAFKA_ADVERTISED_LISTENERS: |
+        SSL://broker:9093,SSL_PLAINTEXT://localhost:29093
       KAFKA_SSL_KEYSTORE_FILENAME: broker.keystore.jks
       KAFKA_SSL_KEYSTORE_CREDENTIALS: cert_creds
       KAFKA_SSL_KEY_CREDENTIALS: cert_creds
@@ -45,11 +53,56 @@ services:
       KAFKA_SECURITY_PROTOCOL: SSL
       KAFKA_SECURITY_INTER_BROKER_PROTOCOL: SSL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_OPTS: "-Djavax.net.debug=ssl"
+        # healthcheck:
+        #   test: ["CMD", "bash", "-c", "echo -n | openssl s_client -connect localhost:9093 -tls1 -CAfile /etc/kafka/secrets/broker.cer.pem -cert /etc/kafka/secrets/producer-cer.pem -key /etc/kafka/secrets/producer-key.pem"]
+        #   interval: 30s
+        #   timeout: 10s
+        #   retries: 4
     volumes:
       - ./secrets:/etc/kafka/secrets
       - ./kafka/kafka-data:/var/lib/kafka/data
       - ./kafka/kafka-log:/var/log/kafka
+    networks:
+      - kafka-network
 
+  schemaregistry:
+    image: confluentinc/cp-schema-registry:7.1.0 
+    container_name: schema-registry
+    hostname: schema-registry
+    user: root
+    ports:
+      - "8181:8181"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: '8181'
+      SCHEMA_REGISTRY_LISTENERS: 'https://0.0.0.0:8181'
+      SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: 'zookeeper:2181'
+        # works if the broker advertize on port SSL://broker:9093
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'SSL://broker:9093' 
+      SCHEMA_REGISTRY_KAFKASTORE_SECURITY_PROTOCOL: SSL
+      SCHEMA_REGISTRY_KAFKASTORE_SSL_KEYSTORE_LOCATION: /etc/schema-registry/secrets/schema-registry.keystore.jks
+      SCHEMA_REGISTRY_SSL_KEYSTORE_LOCATION: /etc/schema-registry/secrets/schema-registry.keystore.jks
+      SCHEMA_REGISTRY_KAFKASTORE_SSL_KEYSTORE_PASSWORD: datahub
+      SCHEMA_REGISTRY_SSL_KEYSTORE_PASSWORD: datahub
+      SCHEMA_REGISTRY_KAFKASTORE_SSL_KEY_PASSWORD: datahub
+      SCHEMA_REGISTRY_SSL_KEY_PASSWORD: datahub
+      SCHEMA_REGISTRY_KAFKASTORE_SSL_TRUSTSTORE_LOCATION: /etc/schema-registry/secrets/schema-registry.truststore.jks
+      SCHEMA_REGISTRY_SSL_TRUSTSTORE_LOCATION: /etc/schema-registry/secrets/schema-registry.truststore.jks
+      SCHEMA_REGISTRY_KAFKASTORE_SSL_TRUSTSTORE_PASSWORD: datahub
+      SCHEMA_REGISTRY_SSL_TRUSTSTORE_PASSWORD: datahub
+      SCHEMA_REGISTRY_SCHEMA_REGISTRY_INTER_INSTANCE_PROTOCOL: https
+      SCHEMA_REGISTRY_KAFKASTORE_TOPIC: _schemas
+      SCHEMA_REGISTRY_SSL_CLIENT_AUTH: 'true'
+    depends_on:
+      - broker
+      #  kafka-ssl:
+      #    condition: service_healthy
+    volumes:
+      - ./secrets:/etc/schema-registry/secrets
+    networks:
+      - kafka-network
 
-
- 
+networks:
+  kafka-network:
+    driver: bridge
+    name: kafka-network 
